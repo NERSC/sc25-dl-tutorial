@@ -200,7 +200,7 @@ class TestDistributed(unittest.TestCase):
         inp.requires_grad = True
 
         # forward pass
-        with torch.autocast(device_type=inp.device.type, dtype=torch.bfloat16):
+        with torch.autocast(device_type=inp.device.type, dtype=torch.float16):
             out = model(inp)
         # loss = nn.MSELoss()(out, inp)
         # loss.backward()
@@ -242,7 +242,7 @@ class TestDistributed(unittest.TestCase):
             # dp split that dataloaders take care of usually
             inp_local = scatter_to_parallel_region(inp, dim=0, comm_name="dp")
         inp_local.requires_grad = True
-        with torch.autocast(device_type=inp.device.type, dtype=torch.bfloat16):
+        with torch.autocast(device_type=inp.device.type, dtype=torch.float16):
             out_local = model_distributed(inp_local)
 
         # loss = nn.MSELoss()(out_local, inp_local)
