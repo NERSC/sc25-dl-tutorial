@@ -217,6 +217,7 @@ class TestDistributed(unittest.TestCase):
     @parameterized.expand(
         [
             [4, 128, 128, 8, 4, 512, 8, 2, 1e-1],
+            [4, 360, 720, 8, 20, 512, 8, 2, 1e-1],
         ]
     )
     def test_distributed_model(
@@ -262,7 +263,7 @@ class TestDistributed(unittest.TestCase):
             device=self.device,
         )
         inp.requires_grad = True
-        autocast_dtype = torch.float16
+        autocast_dtype = torch.bfloat16
         # forward pass
         with torch.autocast(device_type=inp.device.type, dtype=autocast_dtype):
             out = model(inp)

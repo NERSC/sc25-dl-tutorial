@@ -16,6 +16,8 @@ from torch.distributed import ReduceOp
 
 import logging
 from utils import logging_utils
+import warnings
+warnings.simplefilter("ignore", FutureWarning)
 
 logging_utils.config_logger()
 from utils.YParams import YParams
@@ -24,6 +26,7 @@ from utils import comm
 from utils.loss import l2_loss, l2_loss_opt
 from utils.metrics import weighted_rmse
 from networks import vit
+from networks import vit_te
 
 from distributed.mappings import init_ddp_model_and_reduction_hooks
 from distributed.helpers import init_params_for_shared_weights
@@ -52,7 +55,10 @@ def train(params, args, local_rank, world_rank, world_size):
     logging.info("rank %d, data loader initialized" % (world_rank))
 
     # create model
-    model = vit.ViT(params).to(device)
+    if params.model_backend == 'transformer-engine':
+        model = vit_te.ViT(params).to(device)
+    else:  
+        model = vit.ViT(params).to(device)
 
     if params.enable_jit:
 #        if params.distributed and not args.noddp:
@@ -114,10 +120,12 @@ def train(params, args, local_rank, world_rank, world_size):
     # Log initial loss on train and validation to tensorboard
     with torch.no_grad():
         inp, tar = map(lambda x: x.to(device), next(iter(train_data_loader)))
-        gen = model(inp)
+        with autocast('cuda', enabled=params.amp_enabled, dtype=params.amp_dtype):
+            gen = model(inp)
         tr_loss = loss_func(gen, tar)
         inp, tar = map(lambda x: x.to(device), next(iter(val_data_loader)))
-        gen = model(inp)
+        with autocast('cuda', enabled=params.amp_enabled, dtype=params.amp_dtype):
+            gen = model(inp)
         val_loss = loss_func(gen, tar)
         val_rmse = weighted_rmse(gen, tar)
         if params.distributed:

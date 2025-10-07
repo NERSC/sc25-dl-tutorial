@@ -6,6 +6,7 @@ base: &base
   dropout: 0.0
   patch_size: 8
   num_heads: 8
+  model_backend: 'pytorch'
 
   # Training config
   img_size: [360, 720]
@@ -116,8 +117,13 @@ mp: &mp
   embed_dim: 1024 # change to bigger model
   data_loader_config: 'dali'
   amp_mode: fp16
-  enable_jit: true
+  enable_jit: false
   enable_fused: true
+
+mp_te:
+  <<: *mp
+  model_backend: 'transformer-engine'
+  enable_jit: false
 
 mp_bs16:
   <<: *mp

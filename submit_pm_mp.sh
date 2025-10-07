@@ -8,11 +8,11 @@
 #SBATCH --time=03:00:00
 #SBATCH --image=nersc/pytorch:24.10.01
 #SBATCH --module=gpu,nccl-plugin
-#SBATCH -J vit-era5-mpcheck
+#SBATCH -J vit-era5-mp
 #SBATCH -o %x-%j.out
 
-DATADIR=/pscratch/sd/s/shas1693/data/dl-at-scale-training-data
-LOGDIR=${SCRATCH}/dl-at-scale-training/logs
+DATADIR=/pscratch/sd/s/shas1693/data/sc25_tutorial_data
+LOGDIR=${SCRATCH}/sc25-dl-tutorial/logs
 mkdir -p ${LOGDIR}
 args="${@}"
 

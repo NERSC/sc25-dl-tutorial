@@ -188,15 +188,36 @@ class Attention(nn.Module):
         ]  # careful : output has joined, so shared across tp-cp
         self.proj.bias.mark_for_reduction = ["cp"]
 
+    def _pad(self, x):
+        B, N, C = x.shape
+        if comm.get_size("tp-cp") > 1:
+            N_tensor = torch.tensor([N], dtype=torch.long, device=x.device)
+            N_list = [torch.zeros_like(N_tensor) for _ in range(comm.get_size("tp-cp"))]
+            torch.distributed.all_gather(N_list, N_tensor, group=comm.get_group("tp-cp"))
+            max_N = max([n.item() for n in N_list])
+            if max_N % 2 != 0:
+                max_N += 1
+            if N < max_N:
+                pad_size = max_N - N
+                padding = torch.zeros(B, pad_size, C, dtype=x.dtype, device=x.device)
+                x = torch.cat([x, padding], dim=1)
+                N = max_N
+        return x
+
     def forward(self, x):
         B, N, C = x.shape
 
+        x = self._pad(x) # pad if needed for TE to work with odd N or uneven splits
+        N_max = x.shape[1]
         # Compute q, k, v projections
-        q = self.q(x).reshape(B, N, self.num_heads_local, self.head_dim).contiguous()
-        k = self.k(x).reshape(B, N, self.num_heads_local, self.head_dim).contiguous()
-        v = self.v(x).reshape(B, N, self.num_heads_local, self.head_dim).contiguous()
+        q = self.q(x).reshape(B, N_max, self.num_heads_local, self.head_dim).contiguous()
+        k = self.k(x).reshape(B, N_max, self.num_heads_local, self.head_dim).contiguous()
+        v = self.v(x).reshape(B, N_max, self.num_heads_local, self.head_dim).contiguous()
 
-        x = self.attention(q, k, v)
+        x = self.attention(
+                q, k, v,
+            )
+        x = x[:, :N, :] # unpad if needed
         x = x.reshape(B, N, self.num_heads_local * self.head_dim)
 
         x = self.proj(x)
@@ -380,7 +401,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-def ViT_TE(params, **kwargs):
+def ViT(params, **kwargs):
     model = VisionTransformer(
         img_size=params.img_size,
         in_chans=params.n_in_channels,
