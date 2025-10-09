@@ -207,17 +207,17 @@ class TestDistributed(unittest.TestCase):
                 self._copy_mlp_weights(block.mlp, block_distributed.mlp)
                 self._copy_attn_weights(block.attn, block_distributed.attn)
                 # copy norm weights
-                block_distributed.norm1.weight.copy_(block.norm1.weight)
-                block_distributed.norm1.bias.copy_(block.norm1.bias)
-                block_distributed.norm2.weight.copy_(block.norm2.weight)
-                block_distributed.norm2.bias.copy_(block.norm2.bias)
+                block_distributed.norm1.norm.weight.copy_(block.norm1.norm.weight)
+                block_distributed.norm1.norm.bias.copy_(block.norm1.norm.bias)
+                block_distributed.norm2.norm.weight.copy_(block.norm2.norm.weight)
+                block_distributed.norm2.norm.bias.copy_(block.norm2.norm.bias)
             # copy head weights
             model_distributed.head.weight.copy_(model.head.weight)
 
     @parameterized.expand(
         [
-            [4, 128, 128, 8, 4, 512, 8, 2, 1e-1],
-            [4, 360, 720, 8, 20, 512, 8, 2, 1e-1],
+            [4, 128, 128, 8, 4, 512, 8, 2, 1e-2],
+            [4, 360, 720, 8, 20, 512, 8, 2, 1e-2],
         ]
     )
     def test_distributed_model(
@@ -263,7 +263,8 @@ class TestDistributed(unittest.TestCase):
             device=self.device,
         )
         inp.requires_grad = True
-        autocast_dtype = torch.bfloat16
+        # if you use fp16, don't forget about the gradscalers (not impl in this test)
+        autocast_dtype = torch.bfloat16 
         # forward pass
         with torch.autocast(device_type=inp.device.type, dtype=autocast_dtype):
             out = model(inp)
