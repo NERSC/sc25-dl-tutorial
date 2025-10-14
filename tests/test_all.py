@@ -136,7 +136,11 @@ class TestDistributed(unittest.TestCase):
                     else:
                         grad = torch.cat([g.view(-1) for g in gathered_grads])
                     all_grads.append(grad)
-
+        
+        # Handle norm gradients (shared in both tp-cp)
+        if model.norm.norm.weight.grad is not None:
+            all_grads.append(model.norm.norm.weight.grad.view(-1))
+            all_grads.append(model.norm.norm.bias.grad.view(-1))
         # Handle head gradients (shared in both tp-cp)
         if model.head.weight.grad is not None:
             all_grads.append(model.head.weight.grad.view(-1))
@@ -212,6 +216,8 @@ class TestDistributed(unittest.TestCase):
                 block_distributed.norm2.norm.weight.copy_(block.norm2.norm.weight)
                 block_distributed.norm2.norm.bias.copy_(block.norm2.norm.bias)
             # copy head weights
+            model_distributed.norm.norm.weight.copy_(model.norm.norm.weight)
+            model_distributed.norm.norm.bias.copy_(model.norm.norm.bias)
             model_distributed.head.weight.copy_(model.head.weight)
 
     @parameterized.expand(
