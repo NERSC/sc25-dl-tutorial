@@ -1,19 +1,18 @@
 #!/bin/bash 
 #SBATCH -C gpu 
 #SBATCH -q shared
-#SBATCH -A ntrain4
+#SBATCH -A nstaff
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-task 1
 #SBATCH --gpu-bind none
 #SBATCH --time=01:00:00
-#SBATCH --image=nersc/pytorch:24.08.01
+#SBATCH --image=nersc/pytorch:25.06.01
 #SBATCH --module=gpu,nccl-plugin
-#SBATCH --reservation=dlscale_training_1
 #SBATCH -J vit-era5
 #SBATCH -o %x-%j.out
 
-DATADIR=/pscratch/sd/s/shas1693/data/dl-at-scale-training-data
-LOGDIR=${SCRATCH}/dl-at-scale-training/logs
+DATADIR=/pscratch/sd/s/shas1693/data/sc25_tutorial_data
+LOGDIR=${SCRATCH}/sc25-dl-tutorial/logs
 mkdir -p ${LOGDIR}
 args="${@}"
 

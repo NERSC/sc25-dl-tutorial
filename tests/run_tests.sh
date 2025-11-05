@@ -1,6 +1,6 @@
 #!/bin/bash
 
-image=nersc/pytorch:25.02.01
+image=nersc/pytorch:25.06.01
 dp=1
 tp=1
 cp=1

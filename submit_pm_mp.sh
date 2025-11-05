@@ -1,12 +1,12 @@
 #!/bin/bash 
 #SBATCH -C gpu
-#SBATCH -A m4790
-#SBATCH -q premium
+#SBATCH -A nstaff
+#SBATCH -q regular
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-node 4
-#SBATCH --time=03:00:00
-#SBATCH --image=nersc/pytorch:25.02.01
+#SBATCH --time=01:00:00
+#SBATCH --image=nersc/pytorch:25.06.01
 #SBATCH --module=gpu,nccl-plugin
 #SBATCH -J vit-era5-mp
 #SBATCH -o %x-%j.out
