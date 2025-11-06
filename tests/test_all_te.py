@@ -7,7 +7,7 @@ import datetime as dt
 from utils.rank_generator import RankGenerator
 from utils import comm
 
-from networks.vit import VisionTransformer
+from networks.vit_te import VisionTransformer
 from parameterized import parameterized
 from distributed.helpers import (
     compute_split_shapes,
@@ -121,8 +121,7 @@ class TestDistributed(unittest.TestCase):
         for name, param in model.named_parameters():
             if "blocks" in name and param.grad is not None:
                 is_shared_tp = hasattr(param, "is_shared_mp") and any(
-                    isinstance(group, str) and ("tp" in group)
-                    for group in param.is_shared_mp
+                    "tp" in group for group in param.is_shared_mp
                 )
 
                 if is_shared_tp:
@@ -203,13 +202,13 @@ class TestDistributed(unittest.TestCase):
                 self._copy_mlp_weights(block.mlp, block_distributed.mlp)
                 self._copy_attn_weights(block.attn, block_distributed.attn)
                 # copy norm weights
-                block_distributed.norm1.norm.weight.copy_(block.norm1.weight)
-                block_distributed.norm1.norm.bias.copy_(block.norm1.bias)
-                block_distributed.norm2.norm.weight.copy_(block.norm2.weight)
-                block_distributed.norm2.norm.bias.copy_(block.norm2.bias)
+                block_distributed.norm1.norm.weight.copy_(block.norm1.norm.weight)
+                block_distributed.norm1.norm.bias.copy_(block.norm1.norm.bias)
+                block_distributed.norm2.norm.weight.copy_(block.norm2.norm.weight)
+                block_distributed.norm2.norm.bias.copy_(block.norm2.norm.bias)
             # copy head weights
-            model_distributed.norm.norm.weight.copy_(model.norm.weight)
-            model_distributed.norm.norm.bias.copy_(model.norm.bias)
+            model_distributed.norm.norm.weight.copy_(model.norm.norm.weight)
+            model_distributed.norm.norm.bias.copy_(model.norm.norm.bias)
             model_distributed.head.weight.copy_(model.head.weight)
 
     @parameterized.expand(
