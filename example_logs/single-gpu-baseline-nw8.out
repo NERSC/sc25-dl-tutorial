@@ -1,105 +1,0 @@
-Enabling profiling...
-+ srun -u shifter -V /pscratch/sd/s/shas1693/data/sc25_tutorial_data:/data -V /pscratch/sd/s/shas1693/sc25-dl-tutorial/logs:/logs bash -c '
-    source export_DDP_vars.sh
-    nsys profile --trace=cuda,cublas,nvtx --kill none -c cudaProfilerApi -f true -o /pscratch/sd/s/shas1693/sc25-dl-tutorial/logs/baseline_dw8 python train.py --config=short --num_data_workers 8 --run_num=nw8
-    '
-2025-11-11 09:07:13,843 - root - INFO - ------------------ Configuration ------------------
-2025-11-11 09:07:13,844 - root - INFO - Configuration file: /global/u2/s/shas1693/codes/sc25-dl-tutorial/config/ViT.yaml
-2025-11-11 09:07:13,844 - root - INFO - Configuration name: short
-2025-11-11 09:07:13,844 - root - INFO - limit_nsamples 512
-2025-11-11 09:07:13,844 - root - INFO - limit_nsamples_val 128
-2025-11-11 09:07:13,844 - root - INFO - num_iters 128
-2025-11-11 09:07:13,844 - root - INFO - embed_dim 384
-2025-11-11 09:07:13,844 - root - INFO - depth 12
-2025-11-11 09:07:13,844 - root - INFO - dropout 0.0
-2025-11-11 09:07:13,844 - root - INFO - patch_size 8
-2025-11-11 09:07:13,844 - root - INFO - num_heads 8
-2025-11-11 09:07:13,844 - root - INFO - model_backend pytorch
-2025-11-11 09:07:13,845 - root - INFO - img_size [360, 720]
-2025-11-11 09:07:13,845 - root - INFO - dt 1
-2025-11-11 09:07:13,845 - root - INFO - global_batch_size 16
-2025-11-11 09:07:13,845 - root - INFO - amp_mode none
-2025-11-11 09:07:13,845 - root - INFO - enable_fused False
-2025-11-11 09:07:13,845 - root - INFO - enable_jit False
-2025-11-11 09:07:13,845 - root - INFO - expdir /logs
-2025-11-11 09:07:13,845 - root - INFO - lr_schedule cosine
-2025-11-11 09:07:13,845 - root - INFO - lr 0.0005
-2025-11-11 09:07:13,845 - root - INFO - warmup 0
-2025-11-11 09:07:13,845 - root - INFO - optimizer Adam
-2025-11-11 09:07:13,845 - root - INFO - data_loader_config pytorch
-2025-11-11 09:07:13,845 - root - INFO - num_data_workers 8
-2025-11-11 09:07:13,845 - root - INFO - n_in_channels 20
-2025-11-11 09:07:13,845 - root - INFO - n_out_channels 20
-2025-11-11 09:07:13,845 - root - INFO - train_data_path /data/train
-2025-11-11 09:07:13,845 - root - INFO - valid_data_path /data/valid
-2025-11-11 09:07:13,845 - root - INFO - inf_data_path /data/test
-2025-11-11 09:07:13,846 - root - INFO - time_means_path /data/stats/time_means.npy
-2025-11-11 09:07:13,846 - root - INFO - global_means_path /data/stats/global_means.npy
-2025-11-11 09:07:13,846 - root - INFO - global_stds_path /data/stats/global_stds.npy
-2025-11-11 09:07:13,846 - root - INFO - wireup_info env
-2025-11-11 09:07:13,846 - root - INFO - wireup_store tcp
-2025-11-11 09:07:13,846 - root - INFO - amp_enabled False
-2025-11-11 09:07:13,846 - root - INFO - amp_dtype torch.float32
-2025-11-11 09:07:13,846 - root - INFO - ---------------------------------------------------
-2025-11-11 09:07:14,328 - root - INFO - rank 0, begin data loader init
-2025-11-11 09:07:14,966 - root - INFO - Getting file stats from /data/train/1990.h5
-2025-11-11 09:07:14,967 - root - INFO - Overriding total number of samples to: 512
-2025-11-11 09:07:14,967 - root - INFO - Number of samples per year: 1460
-2025-11-11 09:07:14,967 - root - INFO - Found data at path /data/train. Number of examples: 512. Image Shape: 360 x 720 x 20
-2025-11-11 09:07:14,969 - root - INFO - Getting file stats from /data/valid/2016.h5
-2025-11-11 09:07:14,970 - root - INFO - Overriding total number of samples to: 128
-2025-11-11 09:07:14,970 - root - INFO - Number of samples per year: 1460
-2025-11-11 09:07:14,970 - root - INFO - Found data at path /data/valid. Number of examples: 128. Image Shape: 360 x 720 x 20
-2025-11-11 09:07:14,970 - root - INFO - rank 0, data loader initialized
-2025-11-11 09:07:15,830 - root - INFO - VisionTransformer(
-  (patch_embed): PatchEmbed(
-    (proj): Conv2d(20, 384, kernel_size=(8, 8), stride=(8, 8))
-  )
-  (pos_drop): Dropout(p=0.0, inplace=False)
-  (blocks): ModuleList(
-    (0-11): 12 x Block(
-      (drop_path): Identity()
-      (norm1): LayerNorm((384,), eps=1e-06, elementwise_affine=True)
-      (norm2): LayerNorm((384,), eps=1e-06, elementwise_affine=True)
-      (attn): Attention(
-        (q): Linear(in_features=384, out_features=384, bias=True)
-        (k): Linear(in_features=384, out_features=384, bias=True)
-        (v): Linear(in_features=384, out_features=384, bias=True)
-        (attn_drop): Dropout(p=0.0, inplace=False)
-        (proj): Linear(in_features=384, out_features=384, bias=True)
-        (proj_drop): Dropout(p=0.0, inplace=False)
-      )
-      (mlp): MLP(
-        (fc1): Linear(in_features=384, out_features=1536, bias=True)
-        (act): GELU(approximate='none')
-        (fc2): Linear(in_features=1536, out_features=384, bias=True)
-        (drop): Dropout(p=0.0, inplace=False)
-      )
-    )
-  )
-  (norm): LayerNorm((384,), eps=1e-06, elementwise_affine=True)
-  (head): Linear(in_features=384, out_features=1280, bias=False)
-)
-2025-11-11 09:07:15,832 - root - INFO - Starting Training Loop...
-/global/u2/s/shas1693/codes/sc25-dl-tutorial/train.py:176: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
-Consider using tensor.detach() first. (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/native/Scalar.cpp:22.)
-  tr_loss.append(loss.item() / world_size)
-2025-11-11 09:08:13,613 - root - INFO - Time taken for epoch 1 is 45.767648 sec, avg 11.186941 samples/sec
-2025-11-11 09:08:13,614 - root - INFO -   Avg train loss=0.582611
-2025-11-11 09:08:19,841 - root - INFO -   Avg val loss=0.4245404005050659
-2025-11-11 09:08:19,842 - root - INFO -   Total validation time: 5.438702583312988 sec
-2025-11-11 09:09:00,739 - root - INFO - Time taken for epoch 2 is 40.894653 sec, avg 12.519974 samples/sec
-2025-11-11 09:09:00,740 - root - INFO -   Avg train loss=0.392183
-2025-11-11 09:09:07,322 - root - INFO -   Avg val loss=0.37554070353507996
-2025-11-11 09:09:07,322 - root - INFO -   Total validation time: 5.842737913131714 sec
-2025-11-11 09:09:50,106 - root - INFO - Time taken for epoch 3 is 42.780101 sec, avg 11.968181 samples/sec
-2025-11-11 09:09:50,106 - root - INFO -   Avg train loss=0.357540
-2025-11-11 09:09:55,456 - root - INFO -   Avg val loss=0.3546229898929596
-2025-11-11 09:09:55,457 - root - INFO -   Total validation time: 4.614475727081299 sec
-Capture range started in the application.
-Capture range ended in the application.
-Generating '/tmp/nsys-report-4049.qdstrm'
-[1/1] [0%                          ] baseline_dw8.nsys-repProcessing events...
-[1/1] [0%                          ] baseline_dw8.nsys-rep[1/1] [11%                         ] baseline_dw8.nsys-rep[1/1] [===22%                      ] baseline_dw8.nsys-rep[1/1] [========41%                 ] baseline_dw8.nsys-rep[1/1] [=========45%                ] baseline_dw8.nsys-rep[1/1] [==========48%               ] baseline_dw8.nsys-rep[1/1] [===========50%              ] baseline_dw8.nsys-rep[1/1] [=============59%            ] baseline_dw8.nsys-rep[1/1] [===============66%          ] baseline_dw8.nsys-rep[1/1] [===============67%          ] baseline_dw8.nsys-rep[1/1] [================69%         ] baseline_dw8.nsys-rep[1/1] [================71%         ] baseline_dw8.nsys-rep[1/1] [=================73%        ] baseline_dw8.nsys-rep[1/1] [==================75%       ] baseline_dw8.nsys-rep[1/1] [==================77%       ] baseline_dw8.nsys-rep[1/1] [===================79%      ] baseline_dw8.nsys-rep[1/1] [===================81%      ] baseline_dw8.nsys-rep[1/1] [====================83%     ] baseline_dw8.nsys-rep[1/1] [====================85%     ] baseline_dw8.nsys-rep[1/1] [=====================88%    ] baseline_dw8.nsys-rep[1/1] [======================90%   ] baseline_dw8.nsys-rep[1/1] [========================100%] baseline_dw8.nsys-rep[1/1] [========================100%] baseline_dw8.nsys-rep
-Generated:
-	/pscratch/sd/s/shas1693/sc25-dl-tutorial/logs/baseline_dw8.nsys-rep

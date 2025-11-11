@@ -1,111 +1,0 @@
-Enabling profiling...
-+ srun -u shifter -V /pscratch/sd/s/shas1693/data/sc25_tutorial_data:/data -V /pscratch/sd/s/shas1693/sc25-dl-tutorial/logs:/logs bash -c '
-    source export_DDP_vars.sh
-    nsys profile --trace=cuda,cublas,nvtx --kill none -c cudaProfilerApi -f true -o /pscratch/sd/s/shas1693/sc25-dl-tutorial/logs/baseline_dw8_dali_bf16_fused_jit python train.py --config=short --num_data_workers 8 --data_loader_config=dali --amp_mode=bf16 --enable_fused --enable_jit --run_num=nw8_dali_bf16_fused_jit
-    '
-2025-11-11 09:07:08,928 - root - INFO - ------------------ Configuration ------------------
-2025-11-11 09:07:08,929 - root - INFO - Configuration file: /global/u2/s/shas1693/codes/sc25-dl-tutorial/config/ViT.yaml
-2025-11-11 09:07:08,929 - root - INFO - Configuration name: short
-2025-11-11 09:07:08,929 - root - INFO - limit_nsamples 512
-2025-11-11 09:07:08,929 - root - INFO - limit_nsamples_val 128
-2025-11-11 09:07:08,929 - root - INFO - num_iters 128
-2025-11-11 09:07:08,929 - root - INFO - embed_dim 384
-2025-11-11 09:07:08,929 - root - INFO - depth 12
-2025-11-11 09:07:08,930 - root - INFO - dropout 0.0
-2025-11-11 09:07:08,930 - root - INFO - patch_size 8
-2025-11-11 09:07:08,930 - root - INFO - num_heads 8
-2025-11-11 09:07:08,930 - root - INFO - model_backend pytorch
-2025-11-11 09:07:08,930 - root - INFO - img_size [360, 720]
-2025-11-11 09:07:08,930 - root - INFO - dt 1
-2025-11-11 09:07:08,930 - root - INFO - global_batch_size 16
-2025-11-11 09:07:08,930 - root - INFO - amp_mode bf16
-2025-11-11 09:07:08,930 - root - INFO - enable_fused True
-2025-11-11 09:07:08,930 - root - INFO - enable_jit True
-2025-11-11 09:07:08,930 - root - INFO - expdir /logs
-2025-11-11 09:07:08,930 - root - INFO - lr_schedule cosine
-2025-11-11 09:07:08,930 - root - INFO - lr 0.0005
-2025-11-11 09:07:08,930 - root - INFO - warmup 0
-2025-11-11 09:07:08,930 - root - INFO - optimizer Adam
-2025-11-11 09:07:08,930 - root - INFO - data_loader_config dali
-2025-11-11 09:07:08,930 - root - INFO - num_data_workers 8
-2025-11-11 09:07:08,930 - root - INFO - n_in_channels 20
-2025-11-11 09:07:08,930 - root - INFO - n_out_channels 20
-2025-11-11 09:07:08,930 - root - INFO - train_data_path /data/train
-2025-11-11 09:07:08,931 - root - INFO - valid_data_path /data/valid
-2025-11-11 09:07:08,931 - root - INFO - inf_data_path /data/test
-2025-11-11 09:07:08,931 - root - INFO - time_means_path /data/stats/time_means.npy
-2025-11-11 09:07:08,931 - root - INFO - global_means_path /data/stats/global_means.npy
-2025-11-11 09:07:08,931 - root - INFO - global_stds_path /data/stats/global_stds.npy
-2025-11-11 09:07:08,931 - root - INFO - wireup_info env
-2025-11-11 09:07:08,931 - root - INFO - wireup_store tcp
-2025-11-11 09:07:08,931 - root - INFO - amp_enabled True
-2025-11-11 09:07:08,931 - root - INFO - amp_dtype torch.bfloat16
-2025-11-11 09:07:08,931 - root - INFO - ---------------------------------------------------
-2025-11-11 09:07:09,297 - root - INFO - rank 0, begin data loader init
-2025-11-11 09:07:14,859 - root - INFO - Getting file stats from /data/train/1990.h5
-2025-11-11 09:07:14,860 - root - INFO - Overriding total number of samples to: 512
-2025-11-11 09:07:14,861 - root - INFO - Number of samples per year: 1460
-2025-11-11 09:07:14,861 - root - INFO - Found data at path /data/train. Number of examples: 512. Image Shape: 360 x 720 x 20
-2025-11-11 09:07:15,277 - root - INFO - Getting file stats from /data/train/1990.h5
-2025-11-11 09:07:15,277 - root - INFO - Overriding total number of samples to: 512
-2025-11-11 09:07:42,836 - root - INFO - Getting file stats from /data/valid/2016.h5
-2025-11-11 09:07:42,837 - root - INFO - Overriding total number of samples to: 128
-2025-11-11 09:07:42,837 - root - INFO - Number of samples per year: 1460
-2025-11-11 09:07:42,837 - root - INFO - Found data at path /data/valid. Number of examples: 128. Image Shape: 360 x 720 x 20
-2025-11-11 09:07:42,984 - root - INFO - Getting file stats from /data/valid/2016.h5
-2025-11-11 09:07:42,984 - root - INFO - Overriding total number of samples to: 128
-2025-11-11 09:08:10,582 - root - INFO - rank 0, data loader initialized
-2025-11-11 09:08:11,999 - root - INFO - OptimizedModule(
-  (_orig_mod): VisionTransformer(
-    (patch_embed): PatchEmbed(
-      (proj): Conv2d(20, 384, kernel_size=(8, 8), stride=(8, 8))
-    )
-    (pos_drop): Dropout(p=0.0, inplace=False)
-    (blocks): ModuleList(
-      (0-11): 12 x Block(
-        (drop_path): Identity()
-        (norm1): LayerNorm((384,), eps=1e-06, elementwise_affine=True)
-        (norm2): LayerNorm((384,), eps=1e-06, elementwise_affine=True)
-        (attn): Attention(
-          (q): Linear(in_features=384, out_features=384, bias=True)
-          (k): Linear(in_features=384, out_features=384, bias=True)
-          (v): Linear(in_features=384, out_features=384, bias=True)
-          (attn_drop): Dropout(p=0.0, inplace=False)
-          (proj): Linear(in_features=384, out_features=384, bias=True)
-          (proj_drop): Dropout(p=0.0, inplace=False)
-        )
-        (mlp): MLP(
-          (fc1): Linear(in_features=384, out_features=1536, bias=True)
-          (act): GELU(approximate='none')
-          (fc2): Linear(in_features=1536, out_features=384, bias=True)
-          (drop): Dropout(p=0.0, inplace=False)
-        )
-      )
-    )
-    (norm): LayerNorm((384,), eps=1e-06, elementwise_affine=True)
-    (head): Linear(in_features=384, out_features=1280, bias=False)
-  )
-)
-2025-11-11 09:08:12,000 - root - INFO - Starting Training Loop...
-/global/u2/s/shas1693/codes/sc25-dl-tutorial/train.py:176: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
-Consider using tensor.detach() first. (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/native/Scalar.cpp:22.)
-  tr_loss.append(loss.item() / world_size)
-2025-11-11 09:09:25,295 - root - INFO - Time taken for epoch 1 is 41.934996 sec, avg 11.827830 samples/sec
-2025-11-11 09:09:25,296 - root - INFO -   Avg train loss=0.584198
-2025-11-11 09:09:39,185 - root - INFO -   Avg val loss=0.42060598731040955
-2025-11-11 09:09:39,186 - root - INFO -   Total validation time: 13.275460243225098 sec
-2025-11-11 09:09:47,333 - root - INFO - Time taken for epoch 2 is 8.140977 sec, avg 62.891713 samples/sec
-2025-11-11 09:09:47,334 - root - INFO -   Avg train loss=0.389975
-2025-11-11 09:09:49,500 - root - INFO -   Avg val loss=0.374103844165802
-2025-11-11 09:09:49,500 - root - INFO -   Total validation time: 1.5723493099212646 sec
-2025-11-11 09:09:57,669 - root - INFO - Time taken for epoch 3 is 8.001337 sec, avg 63.989305 samples/sec
-2025-11-11 09:09:57,670 - root - INFO -   Avg train loss=0.355320
-2025-11-11 09:09:59,812 - root - INFO -   Avg val loss=0.35250577330589294
-2025-11-11 09:09:59,813 - root - INFO -   Total validation time: 1.576087236404419 sec
-Capture range started in the application.
-Capture range ended in the application.
-Generating '/tmp/nsys-report-19c7.qdstrm'
-[1/1] [0%                          ] baseline_dw8_dali_bf16_fused_jit.nsys-repProcessing events...
-[1/1] [0%                          ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [9%                          ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [==19%                       ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [========41%                 ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [=========44%                ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [=========46%                ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [============56%             ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [==============64%           ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [===============65%          ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [===============66%          ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [===============67%          ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [================68%         ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [================69%         ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [================70%         ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [================71%         ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [=================73%        ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [==================75%       ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [==================77%       ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [===================79%      ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [===================81%      ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [====================83%     ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [====================85%     ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [=====================87%    ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [=====================89%    ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [======================90%   ] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [========================100%] baseline_dw8_dali_bf16_fused_jit.nsys-rep[1/1] [========================100%] baseline_dw8_dali_bf16_fused_jit.nsys-rep
-Generated:
-	/pscratch/sd/s/shas1693/sc25-dl-tutorial/logs/baseline_dw8_dali_bf16_fused_jit.nsys-rep
