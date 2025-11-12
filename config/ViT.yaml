@@ -82,6 +82,14 @@ bs64_opt:
   global_batch_size: 64
   lr: 1e-3
 
+bs64_opt_short:
+  <<: *opt
+  global_batch_size: 64
+  lr: 1e-3
+  limit_nsamples: 2048
+  limit_nsamples_val: 2048
+  num_iters: 128
+
 bs128_opt:
   <<: *opt
   global_batch_size: 128
