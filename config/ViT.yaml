@@ -133,6 +133,19 @@ mp_te:
   model_backend: 'transformer-engine'
   enable_jit: false
 
+mp_short:
+  <<: *mp
+  limit_nsamples: 2048
+  limit_nsamples_val: 2048
+  num_iters: 128
+
+mp_te_short:
+  <<: *mp
+  model_backend: 'transformer-engine'
+  limit_nsamples: 2048
+  limit_nsamples_val: 2048
+  num_iters: 128
+
 mp_bs16:
   <<: *mp
   global_batch_size: 16

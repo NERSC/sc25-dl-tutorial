@@ -472,7 +472,7 @@ ENABLE_PROFILING=1 PROFILE_OUTPUT=dp_bs64 sbatch -N 1 submit_pm_dp.sh --config=b
 
 See if you can spot where the weight gradients are synced in the profile. Also, note if it's happening at the same time as any compute. 
 
-Here's an example zoomed in profile for BS64 (by default the profile will happen only on a single rank but you can save profiles from all ranks as well to look at the difference among different ranks)
+Here's an example zoomed in profile for BS64 (by default the profile will happen only on a single rank but you can save profiles from all ranks as well to look at the difference among different ranks). You can also use our example saved profile [dp_bs64.nsys-rep](sample_nsys_profiles/dp_bs64.nsys-rep) to view the profile.
 
 ![NSYS DP BS64](tutorial_images/nsys_dp.png)
 
@@ -481,6 +481,8 @@ You can play with the `bucket_cap_mb` parameter to see how it affects the profil
 ```
 ENABLE_PROFILING=1 PROFILE_OUTPUT=dp_bs64_bcap2 sbatch -N 1 submit_pm_dp.sh --config=bs64_opt_short --bucket_cap_mb=5 --run_num=profile_bcap2
 ```
+
+and take a look at the profile [dp_bs64_bcap2.nsys-rep](sample_nsys_profiles/dp_bs64_bcap2.nsys-rep). You should see more frequent syncs.
 
 Quick questions:
 - *What if you did not use DDP and directly called `torch.distributed.all_reduce` before the optimizer step to sync gradients? What would you expect to see in the profile?*
@@ -558,7 +560,6 @@ sbatch --nodes 4 submit_pm_mp.sh --config=mp --tensor_parallel=4 --run_num=tp4cp
 2025-11-11 18:04:06,428 - root - INFO -   Avg val loss=0.15165293216705322
 2025-11-11 18:04:06,428 - root - INFO -   Total validation time: 9.85232949256897 sec
 2025-11-11 18:04:07,252 - root - INFO -  Memory usage after forward pass: 29.2655029296875 GB.
-
 ```
 
   
@@ -567,9 +568,21 @@ We see that the memory has reduced to 29G. Also note that the throughput is high
 
   
 
-We also see that the bigger model gets a better RMSE compared to the batch size `64` run from before (with the smaller model):
+We also see that the bigger model gets a better RMSE compared to the batch size `64` run from before (with the smaller model), which is the main reason to use bigger models:
 
 ![model parallel logs](tutorial_images/mp_comp.png)
+
+You can also profile the model parallel code the same way as before. You can use the config `mp_short` to limit the samples (else your profile will be too large). For example, try running:
+
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=mp_tp4 sbatch --nodes 4 submit_pm_mp.sh --config=mp_short --tensor_parallel=4 --run_num=tp4cp1_profile
+```
+
+You will see something like this if you zoomed into the NCCL sections of the profile [mp_tp4.nsys-rep](sample_nsys_profiles/mp_tp4.nsys-rep).
+
+![NSYS MP TP4](tutorial_images/nsys_mp_tp4.png)
+
+As you can see, there are far more frequent NCCL calls in both the forward and backward passes now as we have partitione the weights across the TP GPUs. In the forward pass, these are all-reduce syncs of the activation maps and similarly in the backward pass. Additionally, the backward pass also has NCCL calls to sync the weight gradients (managed by DDP). We can see both these NCCL calls in the profile.
 
 You can try out similar data parallel scaling configs for this model as well. Here's an example screenshot for three different global batch sizes:
 
@@ -598,13 +611,57 @@ self.fc1 = te.Linear(
         )
 ```
 
-You have to pass the TP group and tell TE whether to shard the columns or rows for weights. TE will automatically take care of sharding and the syncs as well as fuse necessary operations. Similarly for self-attention, you can TE's self-attention module. See [our implementation here](networks/vit_te.py#L100-L151).
+You have to pass the TP group and tell TE whether to shard the columns or rows for weights. TE will automatically take care of sharding and the syncs as well as fuse necessary operations. See the full function signature [here](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/api/pytorch.html#transformer_engine.pytorch.Linear).
+
+Similarly for self-attention, you can TE's self-attention module. See [our implementation here](networks/vit_te.py#L100-L151). Take a look at the parameters passed to self-attention: recall that it is the heads that is split across the TP GPUs for self-attention. The function signature is [here](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/api/pytorch.html#transformer_engine.pytorch.DotProductAttention).
+
+You can turn on TE by using the config `mp_te`. For example, try running:
+
+```
+sbatch --nodes=4 submit_pm_mp.sh --config=mp_te --tensor_parallel=4 --run_num=tp4cp1
+```
+
+This will run TP=4 with the TE model. You should see the following log:
+
+```
+2025-11-11 17:55:09,329 - root - INFO -  Memory usage after forward pass: 20.7127685546875 GB.
+2025-11-11 17:59:09,742 - root - INFO - Time taken for epoch 1 is 244.082555 sec, avg 155.226169 samples/sec
+2025-11-11 17:59:09,743 - root - INFO -   Avg train loss=0.330288
+2025-11-11 17:59:21,811 - root - INFO -   Avg val loss=0.24456655979156494
+2025-11-11 17:59:21,812 - root - INFO -   Total validation time: 11.23072862625122 sec
+2025-11-11 17:59:22,505 - root - INFO -  Memory usage after forward pass: 21.3358154296875 GB.
+2025-11-11 18:03:23,454 - root - INFO - Time taken for epoch 2 is 241.637290 sec, avg 157.061851 samples/sec
+2025-11-11 18:03:23,456 - root - INFO -   Avg train loss=0.205363
+2025-11-11 18:03:34,967 - root - INFO -   Avg val loss=0.17549239099025726
+2025-11-11 18:03:34,967 - root - INFO -   Total validation time: 10.86473035812378 sec
+2025-11-11 18:03:35,798 - root - INFO -  Memory usage after forward pass: 21.3358154296875 GB.
+2025-11-11 18:07:37,000 - root - INFO - Time taken for epoch 3 is 242.024709 sec, avg 156.810436 samples/sec
+2025-11-11 18:07:37,025 - root - INFO -   Avg train loss=0.160089
+2025-11-11 18:07:48,470 - root - INFO -   Avg val loss=0.1493777632713318
+2025-11-11 18:07:48,471 - root - INFO -   Total validation time: 10.796507358551025 sec
+2025-11-11 18:07:49,350 - root - INFO -  Memory usage after forward pass: 21.3358154296875 GB.
+```
+
+TE's TP is faster and more memory efficient. 
+
+
+You can profile this as well. For example, try running:
+
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=mp_te_tp4 sbatch --nodes=4 submit_pm_mp.sh --config=mp_te_short --tensor_parallel=4 --run_num=tp4cp1_profile
+```
+
+You should see something like this if you zoomed into the NCCL sections of the profile [mp_te_tp4.nsys-rep](sample_nsys_profiles/mp_te_tp4.nsys-rep).
+
+![NSYS MP TE TP4](tutorial_images/nsys_mp_te_tp4.png)
+
+You will see the same kind of NCCL calls, except with more automatic annotations that TE inserts. For example, above we have zoomed into the MLP section that requires a sync. You can see the first linear layer without any syncs and calling an optimized linear CUDA kernel and the second layer containing the all-reduce sync after the linear layer.
 
 #### More advanced material with context parallelism (optional)
 For high resolution images (common in many scientific problems), it might be more beneficial to shard the sequence (spatial) dimension. We can do this using context parallelism. See the [Megatron-core explanation](https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/context_parallel.html) for the communication collectives we need for `cp`. Now we will use `tp x cp x dp` GPUs. For `cp`, the sequence sharding will require additional `allgather` and `reduce-scatter` operations, which we have implemented. Try running:
 
 ```
-sbatch --nodes 4 submit_pm_mp.sh --config=mp --tensor_parallel=1 --context_parallel=4 --parallel_order=cp-tp-dp
+sbatch --nodes 4 submit_pm_mp.sh --config=mp --tensor_parallel=1 --context_parallel=4 --parallel_order=cp-tp-dp --run_num=tp1cp4
 ```
 
 Now, we are using just context parallelism (so all model parallel GPUs are used to shard the sequence). Be careful, since this means that the weights are *shared* across the `cp` GPUs.
@@ -612,15 +669,41 @@ Now, we are using just context parallelism (so all model parallel GPUs are used 
 *Question: If weights are shared across any model parallel GPUs, what considerations should we keep in mind?*
   
  For shared weights, be careful that the weights are properly initialized and if they need additional reductions, then they are implemented through DDP comm hooks.  
-To keep track of shared weights, we annotate them (see [this example](https://github.com/NERSC/sc24-dl-tutorial/blob/main/distributed/layers.py#L65-L66)) with:
+To keep track of shared weights, we annotate them (see [this example](https://github.com/NERSC/sc25-dl-tutorial/blob/main/distributed/layers.py#L65-L66)) with:
 
 ```
 self.weight.is_shared_mp = ['cp'] 
 self.weight.mark_for_reduction = ['cp'] 
 ```
-Shared weights need to have the same initialization (see [our implementation here](https://github.com/NERSC/sc24-dl-tutorial/blob/main/distributed/helpers.py#L5-L30)). If the input activation grads are sharded, then the weight gradients for the shared weights need an additional AllReduce. Check out the [comm_hooks](https://github.com/NERSC/sc24-dl-tutorial/blob/ss/readme_changes/distributed/mappings.py#L170-L243), we have implemented to do an additional AllReduce of the weight gradients across the `cp` group. 
+Shared weights need to have the same initialization (see [our implementation here](https://github.com/NERSC/sc25-dl-tutorial/blob/main/distributed/helpers.py#L5-L30)). If the input activation grads are sharded, then the weight gradients for the shared weights need an additional AllReduce. Check out the [comm_hooks](https://github.com/NERSC/sc25-dl-tutorial/blob/main/distributed/mappings.py#L170-L243), we have implemented to do an additional AllReduce of the weight gradients across the `cp` group. 
+
+With CP=4, you will see:
+
+```
+2025-11-11 17:50:06,957 - root - INFO -  Memory usage after forward pass: 24.1405029296875 GB.
+2025-11-11 17:53:54,467 - root - INFO - Time taken for epoch 1 is 230.433076 sec, avg 164.420840 samples/sec
+2025-11-11 17:53:54,468 - root - INFO -   Avg train loss=0.330428
+2025-11-11 17:54:06,106 - root - INFO -   Avg val loss=0.24635052680969238
+2025-11-11 17:54:06,107 - root - INFO -   Total validation time: 10.530627012252808 sec
+2025-11-11 17:54:06,655 - root - INFO -  Memory usage after forward pass: 26.6229248046875 GB.
+2025-11-11 17:57:54,866 - root - INFO - Time taken for epoch 2 is 228.752209 sec, avg 165.908780 samples/sec
+2025-11-11 17:57:54,868 - root - INFO -   Avg train loss=0.204775
+2025-11-11 17:58:05,856 - root - INFO -   Avg val loss=0.17873653769493103
+2025-11-11 17:58:05,857 - root - INFO -   Total validation time: 10.345210790634155 sec
+2025-11-11 17:58:06,419 - root - INFO -  Memory usage after forward pass: 26.6229248046875 GB.
+2025-11-11 18:01:55,113 - root - INFO - Time taken for epoch 3 is 229.243580 sec, avg 165.553164 samples/sec
+```
+
+*Question: Why is CP faster than TP in this case?*
 
 **Note:** The right combination of data, tensor, context, and pipeline (if needed) parallelism along with the parallelization order (which group to place on NVLink, for example) requires deep understanding of the sensitivity of the performance to each of these moving parts (as well as the underlying hardware). Typically, engineers build *performance models* to analyze this and discover *optimal* ways to parallelize their model. If you are interested in going deeper and building this intuition, you can check out [performance models for transformers in science](https://arxiv.org/abs/2410.00273).
+
+You can also run CP with the TE model by using the config `mp_te`. For example, try running:
+```
+sbatch --nodes=4 submit_pm_mp.sh --config=mp_te --tensor_parallel=1 --context_parallel=4 --parallel_order=cp-tp-dp --run_num=tp1cp4
+```
+
+**Note** TE expects the local sequence lengths to be even for CP and equal on each CP rank. In our case, with CP=4, our sequence length (360 / 8 * 720 / 8 = 4050) gets split unevenly and with odd values. Hence, it is necessary to pad the sequence length to the next even value. We do this in the [vit_te.py](networks/vit_te.py#L185-L199) file. Hence, we pay a little extra compute. In general, if your workload deviates from the language model paradigm, then you may not be able to use TE directly out-of-the-box.
 
 
 ### Using CUDA Graphs (optional)
