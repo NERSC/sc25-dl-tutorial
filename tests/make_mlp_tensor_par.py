@@ -1,10 +1,6 @@
 import torch
 import torch.nn as nn
 import argparse
-from distributed.mappings import (
-    copy_to_parallel_region, 
-    reduce_from_parallel_region,
-)
 from utils import comm
 from tests.helpers import copy_mlp_weights
 import os
@@ -64,8 +60,7 @@ class DistributedMLP(nn.Module):
 
     def forward(self, x):
         """ forward is incomplete 
-            you have access to copy_to_parallel_region (id forward, allreduce backward)
-            and reduce_from_parallel_region (id backward, allreduce forward)
+            what syncs do you need? Take a look at distributed/mappings.py for the syncs available.
         """
         # TODO: take care of comms
         x = self.fc1(x)
