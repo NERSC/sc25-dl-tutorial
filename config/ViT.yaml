@@ -77,6 +77,14 @@ bs32_opt:
   global_batch_size: 32
   lr: 7.07e-4
 
+bs32_opt_short:
+  <<: *opt
+  global_batch_size: 32
+  lr: 7.07e-4
+  limit_nsamples: 1024
+  limit_nsamples_val: 1024
+  num_iters: 128
+
 bs64_opt:
   <<: *opt
   global_batch_size: 64
@@ -151,10 +159,28 @@ mp_bs16:
   global_batch_size: 16
   lr: 5e-4
 
-mp_bs32:
+mp_bs32: &mp_bs32
   <<: *mp
   global_batch_size: 32
   lr: 7.07e-4
+
+mp_bs32_short:
+  <<: *mp_bs32
+  limit_nsamples: 1024
+  limit_nsamples_val: 1024
+  num_iters: 128
+
+mp_bs32_te:
+  <<: *mp_bs32
+  model_backend: 'transformer-engine'
+  enable_jit: false
+
+mp_bs32_te_short:
+  <<: *mp_bs32
+  model_backend: 'transformer-engine'
+  limit_nsamples: 1024
+  limit_nsamples_val: 1024
+  num_iters: 128
 
 # larger seq length (use local bs = 1 here)
 mp_patch4:

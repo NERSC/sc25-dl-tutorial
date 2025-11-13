@@ -5,7 +5,12 @@ _format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 
 def slurm_filter(record):
-    return int(os.environ["SLURM_PROCID"]) == 0
+    try:
+        rank = int(os.environ["SLURM_PROCID"])
+    except:
+        rank = int(os.environ["OMPI_COMM_WORLD_RANK"])
+
+    return rank == 0
 
 
 def config_logger(log_level=logging.INFO):

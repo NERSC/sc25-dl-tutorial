@@ -26,28 +26,9 @@ Data download (only needed if you want to run our examples elsewhere): https://p
 
 ### Software environment
 
-The instructions in this README are intended to be used with NERSC's Perlmutter machine.
+The instructions in this README are intended to be used with the alternative NVIDIA DLI resources available the day of this tutorial.
 
-Access to the Perlmutter machine is provided for this tutorial via [jupyter.nersc.gov](https://jupyter.nersc.gov). 
-Training account setup instructions will be given during the session. Once you have your provided account credentials, you can log in to Jupyter via the link.
-Once logged into the hub, start a session by clicking the button for Perlmutter Login Node (other options will not work with this tutorial material).
-This will open up a session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
-
-To begin, start a terminal from JupyterHub and clone this repository with:
-```bash
-git clone https://github.com/NERSC/sc25-dl-tutorial.git
-```
-You can use the Jupyter file browser to view and edit source files and scripts. For all of the example commands provided below, make sure you are running them from within the top-level folder of the repository. In your terminal, change to the directory with
-```bash
-cd sc25-dl-tutorial
-```
-
-For running slurm jobs on Perlmutter, we will use training accounts which are provided under the `ntrain5` project. The slurm script `submit_pm.sh` included in the repository is configured to work automatically as is, but if you submit your own custom jobs via `salloc` or `sbatch` you must include the following flags for slurm:
-* `-A ntrain5` is required for training accounts
-* `--reservation=<reservation_name>` is required to access the set of GPU nodes we have reserved for the duration of the tutorial. For the morning  session use `<reservation_name>` set to `sc25_dl_tutorial_1`, and for the afternoon session use `<reservation_name>` set to `sc25_dl_tutorial_2` (we have two different size reservations for the single-GPU and multi-GPU sections respectively)
-
-The code can be run using the `nersc/pytorch:25.06.01` docker container. On Perlmutter, docker containers are run via
-[shifter](https://docs.nersc.gov/development/containers/shifter/), and this container is already downloaded and automatically invoked by our job submission scripts. Our container is based on the [NVIDIA NGC 25.06 pytorch container](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-25-06.html), with a few additional packages added.
+Please reach out to the instructors for instructions on how to access this resource.
 
 ### Installing Nsight Systems
 In this tutorial, we will be generating profile files using NVIDIA Nsight Systems on the remote systems. In order to open and view these
@@ -94,14 +75,11 @@ Note that you will have to adjust the data path in `submit_pm.sh` to point your 
 
 First, let us look at the performance of the training script without optimizations on a single GPU.
 
-On Perlmutter for the tutorial, we will be submitting jobs to the batch queue. To submit this job, use the following command:
+To submit this job, use the following command:
 ```
-sbatch -n 1 -t 20 ./submit_pm.sh --config=short
+./submit_dli.sh --config=short
 ```
-`submit_pm.sh` is a batch submission script that defines resources to be requested by SLURM as well as the command to run.
-Note that any arguments for `train.py`, such as the desired config (`--config`), can be added after `submit_pm.sh` when submitting, and they will be passed to `train.py` properly.
-When using batch submission, you can see the job output by viewing the file `vit-era5-<jobid>.out` in the submission
-directory. You can find the job id of your job using the command `squeue --me` and looking at the first column of the output.
+Note that any arguments for `train.py`, such as the desired config (`--config`), can be added after `submit_dli.sh` when submitting, and they will be passed to `train.py` properly.
 
 This will run 128 training iterations on a single GPU using a default batch size of 16.
 See [`config/ViT.yaml`](config/ViT.yaml) for specific configuration details.
@@ -115,33 +93,37 @@ Note that, to run this, you would submit your job with `--config=base`.
 We want to compare our training results against the `base` config baseline, and TensorBoard makes this easy as long as all training runs are stored in the same place. 
 To copy the example TensorBoard log to the scratch directory where our training jobs will output their logs, do
 ```
-mkdir -p $SCRATCH/sc25-dl-tutorial/logs
-cp -r ./example_logs/base $SCRATCH/sc25-dl-tutorial/logs
+cp -r ./example_logs/base /dli/task/logs
 ```
 
-This scratch directory will serve as our log directory (all results including profiles will be written here). To view results in TensorBoard, open the [`start_tensorboard.ipynb`](start_tensorboard.ipynb) notebook and follow the instructions in it to launch a TensorBoard session in your browser. Once you have TensorBoard open, you should see a dashboard with data for the loss values, learning rate, and average iterations per second. Looking at the validation loss for the `base` config, you should see the following training curve:
+This scratch directory will serve as our log directory (all results including profiles will be written here). To view results in TensorBoard, open the [`start_tensorboard_dli.ipynb`](start_tensorboard_dli.ipynb) notebook and follow the instructions in it to launch a TensorBoard session in your browser. Once you have TensorBoard open, you should see a dashboard with data for the loss values, learning rate, and average iterations per second. Looking at the validation loss for the `base` config, you should see the following training curve:
 ![baseline training](tutorial_images/baseline_tb.png)
 
 As our training with the `short` config runs, it should also dump the training metrics to the TensorBoard directory, and TensorBoard will parse the data and display it for you. You can hit the refresh button in the upper-right corner of TensorBoard to update the plots with the latest data.
 
 ## Single GPU performance profiling and optimization
 
-This is the performance of the baseline script for the first three epochs on a 40GB A100 card with batch size 16 using the `short` config, which limits the number of training and validation samples to 512 and 128 samples respectively:
+This is the performance of the baseline script for the first three epochs on a 94GB H100 NVL card with batch size 16 using the `short` config, which limits the number of training and validation samples to 512 and 128 samples respectively:
 ```
-2025-11-11 09:08:26,273 - root - INFO - Time taken for epoch 1 is 58.777251 sec, avg 8.710853 samples/sec
-2025-11-11 09:08:26,273 - root - INFO -   Avg train loss=0.577625
-2025-11-11 09:08:31,858 - root - INFO -   Avg val loss=0.42094624042510986
-2025-11-11 09:08:31,859 - root - INFO -   Total validation time: 4.857330560684204 sec
-2025-11-11 09:09:26,883 - root - INFO - Time taken for epoch 2 is 55.020942 sec, avg 9.305548 samples/sec
-2025-11-11 09:09:26,884 - root - INFO -   Avg train loss=0.389357
-2025-11-11 09:09:32,268 - root - INFO -   Avg val loss=0.37273770570755005
-2025-11-11 09:09:32,268 - root - INFO -   Total validation time: 4.682427883148193 sec
-2025-11-11 09:10:28,166 - root - INFO - Time taken for epoch 3 is 55.894556 sec, avg 9.160105 samples/sec
-2025-11-11 09:10:28,166 - root - INFO -   Avg train loss=0.354964
-2025-11-11 09:10:33,451 - root - INFO -   Avg val loss=0.35277312994003296
-2025-11-11 09:10:33,451 - root - INFO -   Total validation time: 4.57039737701416 sec
+2025-11-13 21:35:55,423 - root - INFO - Time taken for epoch 1 is 79.249300 sec, avg 6.460625 samples/sec
+2025-11-13 21:35:55,425 - root - INFO -   Avg train loss=0.579433
+2025-11-13 21:36:07,259 - root - INFO -   Avg val loss=0.42868003249168396
+2025-11-13 21:36:07,260 - root - INFO -   Total validation time: 11.2812340259552 sec
+2025-11-13 21:36:47,277 - root - INFO - Time taken for epoch 2 is 39.997329 sec, avg 12.800855 samples/sec
+2025-11-13 21:36:47,277 - root - INFO -   Avg train loss=0.396084
+2025-11-13 21:36:50,967 - root - INFO -   Avg val loss=0.375538170337677
+2025-11-13 21:36:50,967 - root - INFO -   Total validation time: 3.13576340675354 sec
+2025-11-13 21:37:31,451 - root - INFO - Time taken for epoch 3 is 40.464699 sec, avg 12.653004 samples/sec
+2025-11-13 21:37:31,452 - root - INFO -   Avg train loss=0.361612
+2025-11-13 21:37:35,140 - root - INFO -   Avg val loss=0.35445573925971985
+2025-11-13 21:37:35,140 - root - INFO -   Total validation time: 3.123826503753662 sec
+2025-11-13 21:38:15,974 - root - INFO - Time taken for epoch 4 is 40.814237 sec, avg 12.544642 samples/sec
+2025-11-13 21:38:15,975 - root - INFO -   Avg train loss=0.350011
+2025-11-13 21:38:19,655 - root - INFO -   Avg val loss=0.35050657391548157
+2025-11-13 21:38:19,655 - root - INFO -   Total validation time: 3.1182711124420166 sec
+2025-11-13 21:38:19,684 - root - INFO - DONE ---- rank 0
 ```
-After the first epoch, we see that the throughput achieved is about 9 samples/s.
+After the first epoch, we see that the throughput achieved is about 12.5 samples/s.
 
 ### Profiling with Nsight Systems
 #### Adding NVTX ranges and profiler controls
@@ -150,11 +132,11 @@ We can add some manually defined NVTX ranges to the code using `torch.cuda.nvtx.
 We can also add calls to `torch.cuda.profiler.start()` and `torch.cuda.profiler.stop()` to control the duration of the profiling
 (e.g., limit profiling to single epoch). You can `grep` through `train.py` for these API calls to see what we've added in this example.
 
-To generate a profile using our scripts on Perlmutter, run the following command: 
+To generate a profile using our scripts, run the following command:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n 1 -t 20 submit_pm.sh --config=short
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline-dli submit_dli.sh --config=short
 ```
-This command will run four epochs of the training script, profiling only the last epoch run. It will produce a file `baseline.nsys-rep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed. The arg `-c cudaProfilerApi` instructs the profiler to only profile the duration of the runtime between the `torch.cuda.profiler.start()` and `torch.cuda.profiler.stop()` calls.
+This command will run four epochs of the training script, profiling only the last epoch run. It will produce a file `baseline-dli.nsys-rep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed. The arg `-c cudaProfilerApi` instructs the profiler to only profile the duration of the runtime between the `torch.cuda.profiler.start()` and `torch.cuda.profiler.stop()` calls.
 
 To view the profile, download (copy) the generated profile (this will be in your log directory in your scratch) to your local computer and open it in Nsight Systems.
 Loading this profile ([`baseline.nsys-rep`](sample_nsys_profiles/baseline.nsys-rep)) in Nsight Systems will look like this:
@@ -175,36 +157,36 @@ memcopy bandwidth. `persistent_workers` allows PyTorch to reuse workers between 
 respawn them. One knob we've left to adjust is the `num_workers` argument, which we can control via the `--num_data_workers` command
 line arg to our script. The default used by PyTorch is `num_workers=0`, which runs data loading *sequentially* in the training Python process. This is one source of the large gaps we observed in the first profile. By setting `num_workers>0`, we enable PyTorch to use multiprocessing to perform data loading in a side process to hide this cost. We can experiment with the number of workers to see if performance is improved.
 
-We can run this experiment on Perlmutter by running the following command:
+We can run this experiment by running the following command:
 ```
-sbatch -n 1 -t 20 ./submit_pm.sh --config=short --num_data_workers <value of your choice>
+./submit_dli.sh --config=short --num_data_workers <value of your choice>
 ```
 
 For example:
 
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline_dw8 sbatch -n 1 -t 20 ./submit_pm.sh --config=short --num_data_workers 8 --run_num=nw8
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline-dli_dw8 ./submit_dli.sh --config=short --num_data_workers 8 --run_num=nw8
 ```
 
 You can use the `run_num` argument to further sub-tag the same configuration. Here, we used `run_num=nw8`.
 
-This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 16 and 8 data workers:
+This is the performance of the training script for the first three epochs with batch size 16 and 8 data workers:
 ```
-2025-11-11 09:08:13,613 - root - INFO - Time taken for epoch 1 is 45.767648 sec, avg 11.186941 samples/sec
-2025-11-11 09:08:13,614 - root - INFO -   Avg train loss=0.582611
-2025-11-11 09:08:19,841 - root - INFO -   Avg val loss=0.4245404005050659
-2025-11-11 09:08:19,842 - root - INFO -   Total validation time: 5.438702583312988 sec
-2025-11-11 09:09:00,739 - root - INFO - Time taken for epoch 2 is 40.894653 sec, avg 12.519974 samples/sec
-2025-11-11 09:09:00,740 - root - INFO -   Avg train loss=0.392183
-2025-11-11 09:09:07,322 - root - INFO -   Avg val loss=0.37554070353507996
-2025-11-11 09:09:07,322 - root - INFO -   Total validation time: 5.842737913131714 sec
-2025-11-11 09:09:50,106 - root - INFO - Time taken for epoch 3 is 42.780101 sec, avg 11.968181 samples/sec
-2025-11-11 09:09:50,106 - root - INFO -   Avg train loss=0.357540
-2025-11-11 09:09:55,456 - root - INFO -   Avg val loss=0.3546229898929596
-2025-11-11 09:09:55,457 - root - INFO -   Total validation time: 4.614475727081299 sec
+2025-11-13 22:42:09,548 - root - INFO - Time taken for epoch 1 is 33.328508 sec, avg 15.362224 samples/sec
+2025-11-13 22:42:09,548 - root - INFO -   Avg train loss=0.577852
+2025-11-13 22:42:13,377 - root - INFO -   Avg val loss=0.42784014344215393
+2025-11-13 22:42:13,378 - root - INFO -   Total validation time: 3.305051803588867 sec
+2025-11-13 22:42:44,084 - root - INFO - Time taken for epoch 2 is 30.704325 sec, avg 16.675175 samples/sec
+2025-11-13 22:42:44,084 - root - INFO -   Avg train loss=0.396532
+2025-11-13 22:42:48,309 - root - INFO -   Avg val loss=0.37536969780921936
+2025-11-13 22:42:48,310 - root - INFO -   Total validation time: 3.703903913497925 sec
+2025-11-13 22:43:19,734 - root - INFO - Time taken for epoch 3 is 31.423005 sec, avg 16.293795 samples/sec
+2025-11-13 22:43:19,734 - root - INFO -   Avg train loss=0.362079
+2025-11-13 22:43:24,667 - root - INFO -   Avg val loss=0.35496950149536133
+2025-11-13 22:43:24,667 - root - INFO -   Total validation time: 4.411658048629761 sec
 ```
 
-Increasing the number of workers to 8 improves throughput to around 12 samples per second. You can play around with this number but typically 2 - 8 gives you good performance. At some point, you will hit diminishing returns and performance will start to degrade.
+Increasing the number of workers to 8 improves throughput to around 16 samples per second. You can play around with this number but typically 2 - 8 gives you good performance. At some point, you will hit diminishing returns and performance will start to degrade.
 
 We can run the 8 worker configuration through profiler using the instructions in the previous section with the added `--num_data_workers`
 argument and load that profile in Nsight Systems. This is what this profile ([`baseline_dw8.nsys-rep`](sample_nsys_profiles/baseline_dw8.nsys-rep)) looks like:
@@ -231,25 +213,25 @@ The NVIDIA DALI library is a data loading library that can address both of these
 For this tutorial, we've provided an alternative data loader using DALI to accelerate the data augmentations used in this training script that can be found in `utils/data_loader_dali.py`. This data loader is enabled via the command line
 argument `--data_loader_config=dali` to the training script.
 
-We can run this experiment on Perlmutter using DALI with 8 worker threads by running the following command:
+We can run this experiment using DALI with 8 worker threads by running the following command:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline_dw8_dali sbatch -n 1 -t 20 ./submit_pm.sh --config=short --num_data_workers 8 --data_loader_config=dali --run_num=nw8_dali
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline-dli_dw8_dali ./submit_dli.sh --config=short --num_data_workers 8 --data_loader_config=dali --run_num=nw8_dali
 ```
 
 This is the performance of with DALI and 8 data workers:
 ```
-2025-11-11 09:08:57,850 - root - INFO - Time taken for epoch 1 is 37.772197 sec, avg 13.131352 samples/sec
-2025-11-11 09:08:57,851 - root - INFO -   Avg train loss=0.585217
-2025-11-11 09:09:01,064 - root - INFO -   Avg val loss=0.4237671494483948
-2025-11-11 09:09:01,064 - root - INFO -   Total validation time: 2.2668607234954834 sec
-2025-11-11 09:09:39,750 - root - INFO - Time taken for epoch 2 is 38.682904 sec, avg 13.235821 samples/sec
-2025-11-11 09:09:39,751 - root - INFO -   Avg train loss=0.392761
-2025-11-11 09:09:43,216 - root - INFO -   Avg val loss=0.37524354457855225
-2025-11-11 09:09:43,216 - root - INFO -   Total validation time: 2.5416245460510254 sec
-2025-11-11 09:10:21,908 - root - INFO - Time taken for epoch 3 is 38.688848 sec, avg 13.233788 samples/sec
-2025-11-11 09:10:21,909 - root - INFO -   Avg train loss=0.356610
-2025-11-11 09:10:25,364 - root - INFO -   Avg val loss=0.3536340296268463
-2025-11-11 09:10:25,364 - root - INFO -   Total validation time: 2.18052077293396 sec
+2025-11-13 22:49:51,424 - root - INFO - Time taken for epoch 1 is 27.449957 sec, avg 18.069245 samples/sec
+2025-11-13 22:49:51,425 - root - INFO -   Avg train loss=0.586527
+2025-11-13 22:49:53,784 - root - INFO -   Avg val loss=0.43451911211013794
+2025-11-13 22:49:53,784 - root - INFO -   Total validation time: 1.6329052448272705 sec
+2025-11-13 22:50:22,346 - root - INFO - Time taken for epoch 2 is 28.561237 sec, avg 17.926395 samples/sec
+2025-11-13 22:50:22,347 - root - INFO -   Avg train loss=0.400770
+2025-11-13 22:50:24,999 - root - INFO -   Avg val loss=0.3789120018482208
+2025-11-13 22:50:24,999 - root - INFO -   Total validation time: 1.634108066558838 sec
+2025-11-13 22:50:54,252 - root - INFO - Time taken for epoch 3 is 29.251695 sec, avg 17.503259 samples/sec
+2025-11-13 22:50:54,253 - root - INFO -   Avg train loss=0.363414
+2025-11-13 22:50:56,955 - root - INFO -   Avg val loss=0.3558248281478882
+2025-11-13 22:50:56,956 - root - INFO -   Total validation time: 1.629340648651123 sec
 ```
 
 We can run the DALI case through profiler using the instructions in the earlier section with the added `--data_loader_config=dali`
@@ -266,36 +248,36 @@ faster computation with Tensor Cores on NVIDIA GPUs.
 The AMP module in torch is composed of two main parts: `torch.cuda.amp.GradScaler` and `torch.cuda.amp.autocast`. `torch.cuda.amp.GradScaler` handles automatic loss scaling to control the range of FP16 gradients when using FP16 precision. Note that since BF16 precision maintains the range of FP32, loss scaling is not required when using AMP with this data type.
 The `torch.cuda.amp.autocast` context manager handles converting model operations to BF16/FP16 where appropriate.
 
-As a quick note, the A100 GPUs we've been using to report results thus far have been able to benefit from Tensor Core compute via the use of TF32 precision operations, enabled by default for CUDNN and CUBLAS in PyTorch. You may measure the benefit of TF32 precision usage on the A100 GPU by temporarily disabling it via setting the environment variable `NVIDIA_TF32_OVERRIDE=0`. We will leave that to you as an exercise. You should see slower performance when TF32 is disabled.
+As a quick note, the H100 GPUs we've been using to report results thus far have been able to benefit from Tensor Core compute via the use of TF32 precision operations, enabled by default for CUDNN and CUBLAS in PyTorch. You may measure the benefit of TF32 precision usage on the H100 GPU by temporarily disabling it via setting the environment variable `NVIDIA_TF32_OVERRIDE=0`. We will leave that to you as an exercise. You should see slower performance when TF32 is disabled.
 
-Though TF32 helps, AMP can still provide more performance improvement for A100 GPUs,
+Though TF32 helps, AMP can still provide more performance improvement for H100 GPUs,
 as TF32 is a compute type only, leaving all data in full precision FP32. FP16 precision has the compute benefits of Tensor Cores combined with a reduction in storage and memory bandwidth requirements. 
 
 You can turn on AMP with `--amp_mode=fp16` or `--amp_mode=bf16`. Let's do it for BF16.
 
-We can run this experiment using AMP on Perlmutter by running one of the following commands:
+We can run this experiment using AMP by running the following command:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline_dw8_dali_bf16 sbatch -n 1 -t 20 ./submit_pm.sh --config=short --num_data_workers 8 --data_loader_config=dali --amp_mode=bf16 --run_num=nw8_dali_bf16
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline-dli_dw8_dali_bf16 ./submit_dli.sh --config=short --num_data_workers 8 --data_loader_config=dali --amp_mode=bf16 --run_num=nw8_dali_bf16
 ```
 
 
 This is the performance with batch size 16, 8 workers, DALI, and AMP BF16:
 ```
-2025-11-11 09:08:31,171 - root - INFO - Time taken for epoch 1 is 11.124525 sec, avg 44.586173 samples/sec
-2025-11-11 09:08:31,171 - root - INFO -   Avg train loss=0.601194
-2025-11-11 09:08:33,119 - root - INFO -   Avg val loss=0.44043827056884766
-2025-11-11 09:08:33,120 - root - INFO -   Total validation time: 1.3733339309692383 sec
-2025-11-11 09:08:42,628 - root - INFO - Time taken for epoch 2 is 9.471231 sec, avg 54.058443 samples/sec
-2025-11-11 09:08:42,629 - root - INFO -   Avg train loss=0.402042
-2025-11-11 09:08:44,716 - root - INFO -   Avg val loss=0.38301941752433777
-2025-11-11 09:08:44,717 - root - INFO -   Total validation time: 1.4965760707855225 sec
-2025-11-11 09:08:54,185 - root - INFO - Time taken for epoch 3 is 9.432336 sec, avg 54.281358 samples/sec
-2025-11-11 09:08:54,187 - root - INFO -   Avg train loss=0.364391
-2025-11-11 09:08:56,224 - root - INFO -   Avg val loss=0.3609674572944641
-2025-11-11 09:08:56,225 - root - INFO -   Total validation time: 1.4771175384521484 sec
+2025-11-13 22:57:46,895 - root - INFO - Time taken for epoch 1 is 5.987096 sec, avg 82.844844 samples/sec
+2025-11-13 22:57:46,896 - root - INFO -   Avg train loss=0.583240
+2025-11-13 22:57:48,215 - root - INFO -   Avg val loss=0.43116989731788635
+2025-11-13 22:57:48,215 - root - INFO -   Total validation time: 1.0079138278961182 sec
+2025-11-13 22:57:53,210 - root - INFO - Time taken for epoch 2 is 4.994217 sec, avg 102.518575 samples/sec
+2025-11-13 22:57:53,210 - root - INFO -   Avg train loss=0.399165
+2025-11-13 22:57:54,033 - root - INFO -   Avg val loss=0.3795023560523987
+2025-11-13 22:57:54,033 - root - INFO -   Total validation time: 0.5124382972717285 sec
+2025-11-13 22:57:59,085 - root - INFO - Time taken for epoch 3 is 5.051072 sec, avg 101.364614 samples/sec
+2025-11-13 22:57:59,085 - root - INFO -   Avg train loss=0.363820
+2025-11-13 22:57:59,863 - root - INFO -   Avg val loss=0.35601258277893066
+2025-11-13 22:57:59,863 - root - INFO -   Total validation time: 0.47336769104003906 sec
 ```
 
-For this model, we see a massive improvement when using AMP with either FP16 or BF16 precision, improving throughput to over 54 samples/s in each case. BF16 may have a slight edge over FP16 due to the lack of loss scaling.
+For this model, we see a massive improvement when using AMP with either FP16 or BF16 precision, improving throughput to over 100 samples/s in each case. BF16 may have a slight edge over FP16 due to the lack of loss scaling.
 
 For the saved profile: This is ([`baseline_dw8_dali_bf16.nsys-rep`](sample_nsys_profiles/baseline_dw8_dali_bf16.nsys-rep)) looks like:
 ![NSYS DALI AMP](tutorial_images/nsys_dali_bf16_zoomed.png)
@@ -318,23 +300,23 @@ will compile/fuse eligible operations in the model, further reducing latency.
 We can enable these by running the following command:
 
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline_dw8_dali_bf16_fused_jit sbatch -n 1 -t 20 ./submit_pm.sh --config=short --num_data_workers 8 --data_loader_config=dali --amp_mode=bf16 --enable_fused --enable_jit --run_num=nw8_dali_bf16_fused_jit
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline-dli_dw8_dali_bf16_fused_jit ./submit_dli.sh --config=short --num_data_workers 8 --data_loader_config=dali --amp_mode=bf16 --enable_fused --enable_jit --run_num=nw8_dali_bf16_fused_jit
 ```
 
 This is the performance with batch size 16, 8 workers, DALI, AMP, fused optimizer and JIT / torch.compile:
 ```
-2025-11-11 09:09:25,295 - root - INFO - Time taken for epoch 1 is 41.934996 sec, avg 11.827830 samples/sec
-2025-11-11 09:09:25,296 - root - INFO -   Avg train loss=0.584198
-2025-11-11 09:09:39,185 - root - INFO -   Avg val loss=0.42060598731040955
-2025-11-11 09:09:39,186 - root - INFO -   Total validation time: 13.275460243225098 sec
-2025-11-11 09:09:47,333 - root - INFO - Time taken for epoch 2 is 8.140977 sec, avg 62.891713 samples/sec
-2025-11-11 09:09:47,334 - root - INFO -   Avg train loss=0.389975
-2025-11-11 09:09:49,500 - root - INFO -   Avg val loss=0.374103844165802
-2025-11-11 09:09:49,500 - root - INFO -   Total validation time: 1.5723493099212646 sec
-2025-11-11 09:09:57,669 - root - INFO - Time taken for epoch 3 is 8.001337 sec, avg 63.989305 samples/sec
-2025-11-11 09:09:57,670 - root - INFO -   Avg train loss=0.355320
-2025-11-11 09:09:59,812 - root - INFO -   Avg val loss=0.35250577330589294
-2025-11-11 09:09:59,813 - root - INFO -   Total validation time: 1.576087236404419 sec
+2025-11-13 23:03:11,028 - root - INFO - Time taken for epoch 1 is 31.707566 sec, avg 15.642954 samples/sec
+2025-11-13 23:03:11,028 - root - INFO -   Avg train loss=0.586497
+2025-11-13 23:03:22,327 - root - INFO -   Avg val loss=0.4326181709766388
+2025-11-13 23:03:22,327 - root - INFO -   Total validation time: 11.009239435195923 sec
+2025-11-13 23:03:26,382 - root - INFO - Time taken for epoch 2 is 4.053760 sec, avg 126.302508 samples/sec
+2025-11-13 23:03:26,382 - root - INFO -   Avg train loss=0.400471
+2025-11-13 23:03:27,226 - root - INFO -   Avg val loss=0.379550039768219
+2025-11-13 23:03:27,226 - root - INFO -   Total validation time: 0.5370001792907715 sec
+2025-11-13 23:03:31,317 - root - INFO - Time taken for epoch 3 is 4.089726 sec, avg 125.191755 samples/sec
+2025-11-13 23:03:31,317 - root - INFO -   Avg train loss=0.363844
+2025-11-13 23:03:32,124 - root - INFO -   Avg val loss=0.35544320940971375
+2025-11-13 23:03:32,124 - root - INFO -   Total validation time: 0.5088088512420654 sec
 ```
 Running a profile ([`baseline_dw8_dali_bf16_fused_jit.nsys-rep`](sample_nsys_profiles/baseline_dw8_dali_bf16_fused_jit.nsys-rep)) using these new options and loading in Nsight Systems looks like this:
 ![NSYS DALI AMP APEX JIT](tutorial_images/nsys_dali_bf16_fused_jit_zoomed.png)
@@ -344,10 +326,10 @@ As the compute cost of this model is mostly dominated by large GEMMs, latency re
 
 ## Distributed training with data parallelism
 
-Instructions for hands-on with mulit-GPU and multi-node training using distributed data parallelism.
+Instructions for hands-on with multi-GPU training using distributed data parallelism.
 
 Now that we have model training code that is optimized for training on a single GPU,
-we are ready to utilize multiple GPUs and multiple nodes to accelerate the workflow
+we are ready to utilize multiple GPUs to accelerate the workflow
 with *distributed training*. We will use the recommended `DistributedDataParallel`
 wrapper in PyTorch with the NCCL backend for optimized communication operations on
 systems with NVIDIA GPUs. Refer to the PyTorch documentation for additional details
@@ -355,19 +337,15 @@ on the distributed package: https://pytorch.org/docs/stable/distributed.html
 
 ### Code basics
 
-To submit multi-GPU and multi-node jobs, we can use the same slurm script but specify either
-the number of tasks (GPUs) with `-n <number of tasks>` or `-N <number of nodes`. However for 
-this session we will be using a different, larger compute reservation, so we have copied
-the original submission script to a new one (`submit_pm_dp.sh`) which will use the larger reservation.
+To submit multi-GPU jobs, we can use a similar bash script as the earlier section, except
+we modify the `-np` argument of `mpirun` to equal the number of GPUs we want to run on (`-np 2` in this case).
 
-To submit a multi-node, multi-GPU job, you could do, e.g.:
+To submit a multi-GPU job, you can run
 ```
-sbatch -N NUM_NODES submit_pm_dp.sh [OPTIONS]
+submit_dli_dp.sh [OPTIONS]
 ```
 
-This script automatically uses the slurm flags `--ntasks-per-node 4`, `--cpus-per-task 32`, `--gpus-per-node 4`, so slurm will allocate all the CPUs and GPUs available on each Perlmutter GPU node, and launch one process for each GPU in the job.
-
-*Question: why do you think we run 1 task (cpu process) per GPU, instead of 1 task per node (each running 4 GPUs)?*
+*Question: why do you think we run 1 task (cpu process) per GPU, instead of 1 task per node (with each task running multiple GPUs)?*
 
 PyTorch `DistributedDataParallel`, or DDP for short, is flexible and can initialize process groups with a variety of methods. For this code, we will use the standard approach of initializing via environment variables, which can be easily read from the slurm environment. Take a look at the `export_DDP_vars.sh` helper script, which is used by our job script to expose for PyTorch DDP the global rank and node-local rank of each process, along with the total number of ranks and the address and port to use for network communication. In the [`train.py`](train.py) script, near the bottom in the main script execution, we set up the distributed backend using these environment variables via `torch.distributed.init_process_group`.
 
@@ -402,50 +380,28 @@ Feel free to experiment with different values and see what happens.
 
 *Question: what do you think would happen if we simply increased our learning rate without increasing batch size?*
 
-Let's first try running on 4 GPUs on a single node, with a global batch size of 64:
+Let's first try running on 2 GPUs on a single node, with a global batch size of 32:
 ```
-sbatch -N 1 submit_pm_dp.sh --config=bs64_opt
-```
-
-You can also go ahead and submit jobs that will use 4 nodes and 16 nodes, with respective
-batch sizes of 256 and 1024:
-```
-sbatch -N 4 submit_pm_dp.sh --config=bs256_opt
-sbatch -N 16 submit_pm_dp.sh --config=bs1024_opt
+./submit_dli_dp.sh --config=bs32_opt
 ```
 
-For example, with BS64 on 4 GPUs, you would see much faster throughput (around 200 samples/s) due to more GPUs:
-```
-2025-11-11 10:32:41,169 - root - INFO - Time taken for epoch 1 is 225.784968 sec, avg 167.805680 samples/sec
-2025-11-11 10:32:41,280 - root - INFO -   Avg train loss=0.308010
-2025-11-11 10:33:12,681 - root - INFO -   Avg val loss=0.25076618790626526
-2025-11-11 10:33:12,682 - root - INFO -   Total validation time: 29.534873485565186 sec
-2025-11-11 10:36:18,508 - root - INFO - Time taken for epoch 2 is 185.819411 sec, avg 204.241310 samples/sec
-2025-11-11 10:36:18,510 - root - INFO -   Avg train loss=0.219615
-2025-11-11 10:36:30,895 - root - INFO -   Avg val loss=0.19705182313919067
-2025-11-11 10:36:30,895 - root - INFO -   Total validation time: 11.696704626083374 sec
-2025-11-11 10:39:38,753 - root - INFO - Time taken for epoch 3 is 187.851625 sec, avg 202.031789 samples/sec
-2025-11-11 10:39:38,755 - root - INFO -   Avg train loss=0.181791
-2025-11-11 10:39:51,162 - root - INFO -   Avg val loss=0.1697038859128952
-2025-11-11 10:39:51,163 - root - INFO -   Total validation time: 11.6270751953125 sec
-```
+This DLI instance only provides access to 2x H100 GPUs so we cannot run multi-node cases.
 
-and if you use 16 nodes (64 GPUs) with BS1024, you would see:
+With BS32 on 2 GPUs, you would see much faster throughput (around 240 samples/s) due to more GPUs:
 ```
-2025-11-11 10:54:32,122 - root - INFO - Time taken for epoch 1 is 56.093554 sec, avg 657.187814 samples/sec
-2025-11-11 10:54:32,122 - root - INFO -   Avg train loss=0.698029
-2025-11-11 10:54:51,569 - root - INFO -   Avg val loss=0.5566979646682739
-2025-11-11 10:54:51,570 - root - INFO -   Total validation time: 18.72025752067566 sec
-2025-11-11 10:55:06,301 - root - INFO - Time taken for epoch 2 is 14.726653 sec, avg 2572.750220 samples/sec
-2025-11-11 10:55:06,302 - root - INFO -   Avg train loss=0.485387
-2025-11-11 10:55:07,440 - root - INFO -   Avg val loss=0.4250652492046356
-2025-11-11 10:55:07,440 - root - INFO -   Total validation time: 0.455810546875 sec
-2025-11-11 10:55:22,333 - root - INFO - Time taken for epoch 3 is 14.889114 sec, avg 2544.677920 samples/sec
-2025-11-11 10:55:22,334 - root - INFO -   Avg train loss=0.398981
-2025-11-11 10:55:23,500 - root - INFO -   Avg val loss=0.3754423260688782
-2025-11-11 10:55:23,501 - root - INFO -   Total validation time: 0.5062005519866943 sec
+2025-11-13 23:23:00,563 - root - INFO - Time taken for epoch 1 is 187.473859 sec, avg 30.894974 samples/sec
+2025-11-13 23:23:00,564 - root - INFO -   Avg train loss=0.380996
+2025-11-13 23:24:34,467 - root - INFO -   Avg val loss=0.3111618459224701
+2025-11-13 23:24:34,467 - root - INFO -   Total validation time: 91.33372187614441 sec
+2025-11-13 23:24:58,473 - root - INFO - Time taken for epoch 2 is 24.003702 sec, avg 242.629239 samples/sec
+2025-11-13 23:24:58,474 - root - INFO -   Avg train loss=0.297141
+2025-11-13 23:25:04,985 - root - INFO -   Avg val loss=0.2854130268096924
+2025-11-13 23:25:04,985 - root - INFO -   Total validation time: 6.134194612503052 sec
+2025-11-13 23:25:29,118 - root - INFO - Time taken for epoch 3 is 24.132263 sec, avg 241.336673 samples/sec
+2025-11-13 23:25:29,118 - root - INFO -   Avg train loss=0.278346
+2025-11-13 23:25:34,735 - root - INFO -   Avg val loss=0.27113795280456543
+2025-11-13 23:25:34,736 - root - INFO -   Total validation time: 5.198879957199097 sec
 ```
-
 
 Look at your new logs in Tensorboard. Compare the speed of training across runs,
 as well as the loss and RMSE metrics. You can toggle the horizontol axis to show relative time
@@ -467,22 +423,22 @@ Here is a screenshot of tensorboard showing the RMSE vs relative time for the su
 
 You can also profile the data parallel jobs similar to the single GPU profiling section above. You can use the `bs64_opt_short` config for this to limit the number of samples (else the profile will be too large). For example, you can run:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=dp_bs64 sbatch -N 1 submit_pm_dp.sh --config=bs64_opt_short --run_num=profile
+ENABLE_PROFILING=1 PROFILE_OUTPUT=dp_bs32-dli ./submit_dli_dp.sh --config=bs32_opt_short --run_num=profile
 ```
 
 See if you can spot where the weight gradients are synced in the profile. Also, note if it's happening at the same time as any compute. 
 
-Here's an example zoomed in profile for BS64 (by default the profile will happen only on a single rank but you can save profiles from all ranks as well to look at the difference among different ranks). You can also use our example saved profile [dp_bs64.nsys-rep](sample_nsys_profiles/dp_bs64.nsys-rep) to view the profile.
+Here's an example zoomed in profile for BS64 (by default the profile will happen only on a single rank but you can save profiles from all ranks as well to look at the difference among different ranks). You can also use our example saved profile [dp_bs32-dli.nsys-rep](sample_nsys_profiles/dp_bs32-dli.nsys-rep) to view the profile.
 
 ![NSYS DP BS64](tutorial_images/nsys_dp.png)
 
 You can play with the `bucket_cap_mb` parameter to see how it affects the profile. Smaller values will have smaller bucket sizes for the all-reduce and hence you should see more frequent syncs. For example, you can run:
 
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=dp_bs64_bcap2 sbatch -N 1 submit_pm_dp.sh --config=bs64_opt_short --bucket_cap_mb=5 --run_num=profile_bcap2
+ENABLE_PROFILING=1 PROFILE_OUTPUT=dp_bs32_bcap2-dli ./submit_dli_dp.sh --config=bs32_opt_short --bucket_cap_mb=5 --run_num=profile_bcap2
 ```
 
-and take a look at the profile [dp_bs64_bcap2.nsys-rep](sample_nsys_profiles/dp_bs64_bcap2.nsys-rep). You should see more frequent syncs.
+and take a look at the profile [dp_bs32_bcap2-dli.nsys-rep](sample_nsys_profiles/dp_bs32_bcap2-dli.nsys-rep). You should see more frequent syncs.
 
 Quick questions:
 - *What if you did not use DDP and directly called `torch.distributed.all_reduce` before the optimizer step to sync gradients? What would you expect to see in the profile?*
@@ -524,19 +480,13 @@ We highly recommend that whenever you are writing any model parallel code, you w
 
 We have implemented a quick example that loads an MLP and tests this in [tests/make_mlp_tensor_par.py](tests/make_mlp_tensor_par.py).  Here, you will find `MLP` and `DistributedMLP`. The `DistributedMLP` is supposed to be the tensor parallel version of the `MLP` model. However, we have not implemented it yet and hence the test will fail. 
 
-Let's try to fix it. First, let's request an interactive node to test the code by doing the following:
+Let's try to fix it. Try running the test with:
 
 ```
-salloc --nodes 1 --qos interactive -t 30 -C gpu -A ntrain5
+bash tests/run_example_dli.sh 2
 ```
 
-This will place you on a compute node with 4 GPUs. This is your test space where you can try things out using up to 4 GPUs. Try running the test with:
-
-```
-bash tests/run_example.sh 4
-```
-
-This will use 4 GPUs and try to run both the single and distributed MLP models on a dummy input and check if they have the same forward pass output and backward pass input gradients. Currently it will fail.
+This will use 2 GPUs and try to run both the single and distributed MLP models on a dummy input and check if they have the same forward pass output and backward pass input gradients. Currently it will fail.
 
 *Excercise: Fill in the missing implementation details in `DistributedMLP`. You need to split the weights and take care of the syncs. If the implementation is correct, the errors should be small*
 
@@ -557,74 +507,83 @@ DistributedMLP(
 )
 ```
 
-Note that the distributed model's out_features is 1/4th of the original model's out_features when you use 4 GPUs.
+Note that the distributed model's out_features is 1/2 of the original model's out_features when you use 2 GPUs.
 
 
 ### Running the model parallel code
 
-The train script for model-parallel training is at [`train_mp.py`](train_mp.py). The model parallel size is defined by `tp` and `cp`. Let's first focus on just tensor parallelism `tp`. Setting the parameter `tensor_parallel` to `4`, for example, will enable 4-way tensor/model parallelism. Let's run a larger model by increasing our `embed_dim` to `1024`. The config for this is called `mp` which trains the larger model assuming a global batch size of `64` with 4 GPUs for data parallelism (hence local batch size is `16`). Let's initially try running this larger model with _no_ model parallelism by setting `tensor_parallel=1` and running it on 4 GPUs with the following command:
+The train script for model-parallel training is at [`train_mp.py`](train_mp.py). The model parallel size is defined by `tp` and `cp`. Let's first focus on just tensor parallelism `tp`. Setting the parameter `tensor_parallel` to `2`, for example, will enable 2-way tensor/model parallelism. Let's run a larger model by increasing our `embed_dim` to `1024`. The config for this is called `mp` which trains the larger model assuming a global batch size of `64` with 2 GPUs for data parallelism (hence local batch size is `32`). Let's initially try running this larger model with _no_ model parallelism by setting `tensor_parallel=1` and running it on 2 GPUs with the following command:
 
 ```
-sbatch --nodes 1 submit_pm_mp.sh --config=mp --tensor_parallel=1 --run_num=tp1cp1
+./submit_dli_mp.sh --config=mp --tensor_parallel=1 --run_num=tp1cp1
 ```
 
-If this job runs on 40G GPUs on Perlmutter, we can see from the logs that the job crashes with an OOM signal because the model is too big:
+Running this job, we can see from the logs that the job runs and nearly consumes all the GPU memory on the H100 cards (about 80 GB out of 94 GB):
 
 ```
-[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 508.00 MiB. GPU 0 has a total capacity of 39.38 GiB of which 478.12 MiB is free. Including non-PyTorch memory, this process has 38.89 GiB memory in use. Of the allocated memory 32.00 GiB is allocated by PyTorch, and 333.01 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+2025-11-14 05:29:57,638 - root - INFO -  Memory usage after forward pass: 79.20367431640625 GB.
+2025-11-14 05:31:01,944 - root - INFO - Time taken for epoch 1 is 65.451304 sec, avg 88.004359 samples/sec
+2025-11-14 05:31:01,945 - root - INFO -   Avg train loss=0.584325
+2025-11-14 05:31:14,780 - root - INFO -   Avg val loss=0.5143224000930786
+2025-11-14 05:31:14,780 - root - INFO -   Total validation time: 11.918781280517578 sec
+2025-11-14 05:31:15,515 - root - INFO -  Memory usage after forward pass: 81.43218994140625 GB.
+2025-11-14 05:32:20,661 - root - INFO - Time taken for epoch 2 is 65.879596 sec, avg 88.403700 samples/sec
+2025-11-14 05:32:20,663 - root - INFO -   Avg train loss=0.488804
+2025-11-14 05:32:33,883 - root - INFO -   Avg val loss=0.4818555414676666
+2025-11-14 05:32:33,883 - root - INFO -   Total validation time: 12.2490234375 sec
+2025-11-14 05:32:34,615 - root - INFO -  Memory usage after forward pass: 81.43218994140625 GB.
+2025-11-14 05:33:39,854 - root - INFO - Time taken for epoch 3 is 65.968878 sec, avg 88.284054 samples/sec
+2025-11-14 05:33:39,854 - root - INFO -   Avg train loss=0.501273
+2025-11-14 05:33:53,042 - root - INFO -   Avg val loss=0.5085552930831909
+2025-11-14 05:33:53,042 - root - INFO -   Total validation time: 12.165823221206665 sec
+2025-11-14 05:33:53,776 - root - INFO -  Memory usage after forward pass: 81.43218994140625 GB.
 ```
 
-If we run it on an 80G GPU, we can see the estimated memory usage to be around 45GB and hence just overflows the 40G GPU. While this example is instructive, larger models (and/or larger inputs) can push the memory consumption significantly higher.
+We can try increasing tensor parallelism. Let's run it with `tensor_parallel=2`, which will partition/shard the hidden dimensions of the MLP weights and biases as well as the attention heads.
 
-
-Let's run it with `tensor_parallel=4`, which will partition/shard the hidden dimensions of the MLP weights and biases as well as the attention heads.
-
-Note here that 4 GPUs are used for model parallelism. Recall our global batch size is `64`. How many GPUs do we need? We also want 4-way data parallel, in addition to model parallelism, here: therefore, we should run on 16 GPUs (or 4 nodes on Perlmutter). Remember that we are assuming `tp x dp` GPUs always. Run this config with the command:
+Note here that 2 GPUs are used for model parallelism. Recall our global batch size is `64`. How many GPUs do we need? We also want 2-way data parallel, in addition to model parallelism, here: therefore, we should run on 4 GPUs if we want to maintain both model and data parallelism. Remember that we are assuming `tp x dp` GPUs always. With that said, we only have access to 2 GPUs on these instances, so in lieu of this, we will remove data parallelism entirely and run tensor parallel only. To accomplish this, we should run with `--tensor_parallel=2` and `--config=mp_bs32` which reduces the global batch size to `32`:
 
 ```
-sbatch --nodes 4 submit_pm_mp.sh --config=mp --tensor_parallel=4 --run_num=tp4cp1
+./submit_dli_mp.sh --config=mp_bs32 --tensor_parallel=2 --run_num=tp2cp1
 ```
 
 ```
-2025-11-11 17:48:32,573 - root - INFO -  Memory usage after forward pass: 28.6424560546875 GB.
-2025-11-11 17:53:31,612 - root - INFO - Time taken for epoch 1 is 301.890294 sec, avg 125.502544 samples/sec
-2025-11-11 17:53:31,614 - root - INFO -   Avg train loss=0.331208
-2025-11-11 17:53:43,511 - root - INFO -   Avg val loss=0.24403679370880127
-2025-11-11 17:53:43,512 - root - INFO -   Total validation time: 10.686778783798218 sec
-2025-11-11 17:53:44,073 - root - INFO -  Memory usage after forward pass: 29.2655029296875 GB.
-2025-11-11 17:58:43,811 - root - INFO - Time taken for epoch 2 is 300.292863 sec, avg 126.383290 samples/sec
-2025-11-11 17:58:44,031 - root - INFO -   Avg train loss=0.204494
-2025-11-11 17:58:55,053 - root - INFO -   Avg val loss=0.17499171197414398
-2025-11-11 17:58:55,054 - root - INFO -   Total validation time: 10.495761156082153 sec
-2025-11-11 17:58:55,648 - root - INFO -  Memory usage after forward pass: 29.2655029296875 GB.
-2025-11-11 18:03:55,354 - root - INFO - Time taken for epoch 3 is 300.250531 sec, avg 126.401109 samples/sec
-2025-11-11 18:03:55,356 - root - INFO -   Avg train loss=0.159383
-2025-11-11 18:04:06,428 - root - INFO -   Avg val loss=0.15165293216705322
-2025-11-11 18:04:06,428 - root - INFO -   Total validation time: 9.85232949256897 sec
-2025-11-11 18:04:07,252 - root - INFO -  Memory usage after forward pass: 29.2655029296875 GB.
+2025-11-14 05:37:34,019 - root - INFO -  Memory usage after forward pass: 67.16070556640625 GB.
+2025-11-14 05:39:43,563 - root - INFO - Time taken for epoch 1 is 130.651251 sec, avg 44.331761 samples/sec
+2025-11-14 05:39:43,564 - root - INFO -   Avg train loss=0.455491
+2025-11-14 05:40:09,855 - root - INFO -   Avg val loss=0.42228102684020996
+2025-11-14 05:40:09,855 - root - INFO -   Total validation time: 25.447359800338745 sec
+2025-11-14 05:40:10,586 - root - INFO -  Memory usage after forward pass: 69.38922119140625 GB.
+2025-11-14 05:42:18,725 - root - INFO - Time taken for epoch 2 is 128.867599 sec, avg 45.193672 samples/sec
+2025-11-14 05:42:18,725 - root - INFO -   Avg train loss=0.445581
+2025-11-14 05:42:45,305 - root - INFO -   Avg val loss=0.4779789447784424
+2025-11-14 05:42:45,305 - root - INFO -   Total validation time: 25.772228002548218 sec
+2025-11-14 05:42:46,036 - root - INFO -  Memory usage after forward pass: 69.38922119140625 GB.
+2025-11-14 05:44:54,045 - root - INFO - Time taken for epoch 3 is 128.738434 sec, avg 45.239016 samples/sec
+2025-11-14 05:44:54,046 - root - INFO -   Avg train loss=0.483106
+2025-11-14 05:45:20,579 - root - INFO -   Avg val loss=0.4856207072734833
+2025-11-14 05:45:20,579 - root - INFO -   Total validation time: 25.731536865234375 sec
+2025-11-14 05:45:21,307 - root - INFO -  Memory usage after forward pass: 69.38922119140625 GB.
 ```
 
-  
+We see that the memory usage has reduced to 69 GB, but so has throughput. Generally, data parallelism will scale better than tensor parallelism, but tensor
+parallelism cannot be avoided in cases where the model does not fit on a single GPU.
 
-We see that the memory has reduced to 29G. Also note that the throughput is higher.
-
-  
-
-We also see that the bigger model gets a better RMSE compared to the batch size `64` run from before (with the smaller model), which is the main reason to use bigger models:
+Turning attention to Perlmutter results, we also see that the bigger model gets a better RMSE, which is the main reason to use bigger models:
 
 ![model parallel logs](tutorial_images/mp_comp.png)
 
 You can also profile the model parallel code the same way as before. You can use the config `mp_short` to limit the samples (else your profile will be too large). For example, try running:
 
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=mp_tp4 sbatch --nodes 4 submit_pm_mp.sh --config=mp_short --tensor_parallel=4 --run_num=tp4cp1_profile
+ENABLE_PROFILING=1 PROFILE_OUTPUT=mp_bs32_tp2-dli ./submit_dli_mp.sh --config=mp_bs32_short --tensor_parallel=2 --run_num=tp2cp1_profile
 ```
 
 You will see something like this if you zoomed into the NCCL sections of the profile [mp_tp4.nsys-rep](sample_nsys_profiles/mp_tp4.nsys-rep).
 
 ![NSYS MP TP4](tutorial_images/nsys_mp_tp4.png)
 
-As you can see, there are far more frequent NCCL calls in both the forward and backward passes now as we have partitioned the weights across the TP GPUs. In the forward pass, these are all-reduce syncs of the activation maps and similarly in the backward pass. Additionally, the backward pass also has NCCL calls to sync the weight gradients (managed by DDP). We can see both these NCCL calls in the profile.
+As you can see, there are far more frequent NCCL calls in both the forward and backward passes now as we have partitioned the weights across the TP GPUs. In the forward pass, these are all-reduce syncs of the activation maps and similarly in the backward pass. Additionally, the backward pass also has NCCL calls to sync the weight gradients (managed by DDP). We can see both these NCCL calls in the multi-node sample profiles that use both tensor and data parallelism.
 
 You can try out similar data parallel scaling configs for this model as well. Here's an example screenshot for three different global batch sizes:
 
@@ -657,31 +616,31 @@ You have to pass the TP group and tell TE whether to shard the columns or rows f
 
 Similarly for self-attention, you can TE's self-attention module. See [our implementation here](networks/vit_te.py#L100-L151). Take a look at the parameters passed to self-attention: recall that it is the heads that is split across the TP GPUs for self-attention. The function signature is [here](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/api/pytorch.html#transformer_engine.pytorch.DotProductAttention).
 
-You can turn on TE by using the config `mp_te`. For example, try running:
+You can turn on TE by using the config `mp_bs32_te`. For example, try running:
 
 ```
-sbatch --nodes=4 submit_pm_mp.sh --config=mp_te --tensor_parallel=4 --run_num=tp4cp1
+./submit_dli_mp.sh --config=mp_bs32_te --tensor_parallel=2 --run_num=tp2cp1
 ```
 
-This will run TP=4 with the TE model. You should see the following log:
+This will run TP=2 with the TE model. You should see the following log:
 
 ```
-2025-11-11 17:55:09,329 - root - INFO -  Memory usage after forward pass: 20.7127685546875 GB.
-2025-11-11 17:59:09,742 - root - INFO - Time taken for epoch 1 is 244.082555 sec, avg 155.226169 samples/sec
-2025-11-11 17:59:09,743 - root - INFO -   Avg train loss=0.330288
-2025-11-11 17:59:21,811 - root - INFO -   Avg val loss=0.24456655979156494
-2025-11-11 17:59:21,812 - root - INFO -   Total validation time: 11.23072862625122 sec
-2025-11-11 17:59:22,505 - root - INFO -  Memory usage after forward pass: 21.3358154296875 GB.
-2025-11-11 18:03:23,454 - root - INFO - Time taken for epoch 2 is 241.637290 sec, avg 157.061851 samples/sec
-2025-11-11 18:03:23,456 - root - INFO -   Avg train loss=0.205363
-2025-11-11 18:03:34,967 - root - INFO -   Avg val loss=0.17549239099025726
-2025-11-11 18:03:34,967 - root - INFO -   Total validation time: 10.86473035812378 sec
-2025-11-11 18:03:35,798 - root - INFO -  Memory usage after forward pass: 21.3358154296875 GB.
-2025-11-11 18:07:37,000 - root - INFO - Time taken for epoch 3 is 242.024709 sec, avg 156.810436 samples/sec
-2025-11-11 18:07:37,025 - root - INFO -   Avg train loss=0.160089
-2025-11-11 18:07:48,470 - root - INFO -   Avg val loss=0.1493777632713318
-2025-11-11 18:07:48,471 - root - INFO -   Total validation time: 10.796507358551025 sec
-2025-11-11 18:07:49,350 - root - INFO -  Memory usage after forward pass: 21.3358154296875 GB.
+2025-11-14 06:05:27,128 - root - INFO -  Memory usage after forward pass: 48.98883056640625 GB.
+2025-11-14 06:06:58,143 - root - INFO - Time taken for epoch 1 is 92.366387 sec, avg 62.706794 samples/sec
+2025-11-14 06:06:58,146 - root - INFO -   Avg train loss=0.441541
+2025-11-14 06:07:19,393 - root - INFO -   Avg val loss=0.40129417181015015
+2025-11-14 06:07:19,394 - root - INFO -   Total validation time: 20.730976104736328 sec
+2025-11-14 06:07:20,129 - root - INFO -  Memory usage after forward pass: 50.96539306640625 GB.
+2025-11-14 06:08:50,366 - root - INFO - Time taken for epoch 2 is 90.957764 sec, avg 64.029718 samples/sec
+2025-11-14 06:08:50,367 - root - INFO -   Avg train loss=0.417613
+2025-11-14 06:09:11,951 - root - INFO -   Avg val loss=0.44142240285873413
+2025-11-14 06:09:11,952 - root - INFO -   Total validation time: 21.095282316207886 sec
+2025-11-14 06:09:12,673 - root - INFO -  Memory usage after forward pass: 50.96539306640625 GB.
+2025-11-14 06:10:43,014 - root - INFO - Time taken for epoch 3 is 91.057980 sec, avg 63.959249 samples/sec
+2025-11-14 06:10:43,016 - root - INFO -   Avg train loss=0.469975
+2025-11-14 06:11:04,709 - root - INFO -   Avg val loss=0.4649982750415802
+2025-11-14 06:11:04,710 - root - INFO -   Total validation time: 21.17133069038391 sec
+2025-11-14 06:11:05,447 - root - INFO -  Memory usage after forward pass: 50.96539306640625 GB.
 ```
 
 TE's TP is faster and more memory efficient. 
@@ -690,7 +649,7 @@ TE's TP is faster and more memory efficient.
 You can profile this as well. For example, try running:
 
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=mp_te_tp4 sbatch --nodes=4 submit_pm_mp.sh --config=mp_te_short --tensor_parallel=4 --run_num=tp4cp1_profile
+ENABLE_PROFILING=1 PROFILE_OUTPUT=mp_bs32_te_tp2-dli ./submit_dli_mp.sh --config=mp_bs32_te_short --tensor_parallel=2 --run_num=tp2cp1_profile
 ```
 
 You should see something like this if you zoomed into the NCCL sections of the profile [mp_te_tp4.nsys-rep](sample_nsys_profiles/mp_te_tp4.nsys-rep).
@@ -703,7 +662,7 @@ You will see the same kind of NCCL calls, except with more automatic annotations
 For high resolution images (common in many scientific problems), it might be more beneficial to shard the sequence (spatial) dimension. We can do this using context parallelism. See the [Megatron-core explanation](https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/context_parallel.html) for the communication collectives we need for `cp`. Now we will use `tp x cp x dp` GPUs. For `cp`, the sequence sharding will require additional `allgather` and `reduce-scatter` operations, which we have implemented. Try running:
 
 ```
-sbatch --nodes 4 submit_pm_mp.sh --config=mp --tensor_parallel=1 --context_parallel=4 --parallel_order=cp-tp-dp --run_num=tp1cp4
+./submit_dli_mp.sh --config=mp_bs32 --tensor_parallel=1 --context_parallel=2 --parallel_order=cp-tp-dp --run_num=tp1cp2
 ```
 
 Now, we are using just context parallelism (so all model parallel GPUs are used to shard the sequence). Be careful, since this means that the weights are *shared* across the `cp` GPUs.
@@ -719,33 +678,37 @@ self.weight.mark_for_reduction = ['cp']
 ```
 Shared weights need to have the same initialization (see [our implementation here](https://github.com/NERSC/sc25-dl-tutorial/blob/main/distributed/helpers.py#L5-L30)). If the input activation grads are sharded, then the weight gradients for the shared weights need an additional AllReduce. Check out the [comm_hooks](https://github.com/NERSC/sc25-dl-tutorial/blob/main/distributed/mappings.py#L224-L279), we have implemented to do an additional AllReduce of the weight gradients across the `cp` group. 
 
-With CP=4, you will see:
+With CP=2, you will see:
 
 ```
-2025-11-11 17:50:06,957 - root - INFO -  Memory usage after forward pass: 24.1405029296875 GB.
-2025-11-11 17:53:54,467 - root - INFO - Time taken for epoch 1 is 230.433076 sec, avg 164.420840 samples/sec
-2025-11-11 17:53:54,468 - root - INFO -   Avg train loss=0.330428
-2025-11-11 17:54:06,106 - root - INFO -   Avg val loss=0.24635052680969238
-2025-11-11 17:54:06,107 - root - INFO -   Total validation time: 10.530627012252808 sec
-2025-11-11 17:54:06,655 - root - INFO -  Memory usage after forward pass: 26.6229248046875 GB.
-2025-11-11 17:57:54,866 - root - INFO - Time taken for epoch 2 is 228.752209 sec, avg 165.908780 samples/sec
-2025-11-11 17:57:54,868 - root - INFO -   Avg train loss=0.204775
-2025-11-11 17:58:05,856 - root - INFO -   Avg val loss=0.17873653769493103
-2025-11-11 17:58:05,857 - root - INFO -   Total validation time: 10.345210790634155 sec
-2025-11-11 17:58:06,419 - root - INFO -  Memory usage after forward pass: 26.6229248046875 GB.
-2025-11-11 18:01:55,113 - root - INFO - Time taken for epoch 3 is 229.243580 sec, avg 165.553164 samples/sec
+2025-11-14 06:25:14,365 - root - INFO -  Memory usage after forward pass: 59.16656494140625 GB.
+2025-11-14 06:26:57,038 - root - INFO - Time taken for epoch 1 is 103.656717 sec, avg 55.876746 samples/sec
+2025-11-14 06:26:57,038 - root - INFO -   Avg train loss=0.448378
+2025-11-14 06:27:19,867 - root - INFO -   Avg val loss=0.40797483921051025
+2025-11-14 06:27:19,867 - root - INFO -   Total validation time: 22.25447916984558 sec
+2025-11-14 06:27:20,448 - root - INFO -  Memory usage after forward pass: 63.25640869140625 GB.
+2025-11-14 06:29:03,303 - root - INFO - Time taken for epoch 2 is 103.434592 sec, avg 56.306115 samples/sec
+2025-11-14 06:29:03,303 - root - INFO -   Avg train loss=0.417294
+2025-11-14 06:29:26,440 - root - INFO -   Avg val loss=0.43143343925476074
+2025-11-14 06:29:26,440 - root - INFO -   Total validation time: 22.534797191619873 sec
+2025-11-14 06:29:27,027 - root - INFO -  Memory usage after forward pass: 63.25640869140625 GB.
+2025-11-14 06:31:09,811 - root - INFO - Time taken for epoch 3 is 103.369257 sec, avg 56.341703 samples/sec
+2025-11-14 06:31:09,811 - root - INFO -   Avg train loss=0.470632
+2025-11-14 06:31:32,925 - root - INFO -   Avg val loss=0.46831414103507996
+2025-11-14 06:31:32,926 - root - INFO -   Total validation time: 22.453986167907715 sec
+2025-11-14 06:31:33,506 - root - INFO -  Memory usage after forward pass: 63.25640869140625 GB.
 ```
 
 *Question: Why is CP faster than TP in this case?*
 
 **Note:** The right combination of data, tensor, context, and pipeline (if needed) parallelism along with the parallelization order (which group to place on NVLink, for example) requires deep understanding of the sensitivity of the performance to each of these moving parts (as well as the underlying hardware). Typically, engineers build *performance models* to analyze this and discover *optimal* ways to parallelize their model. If you are interested in going deeper and building this intuition, you can check out [performance models for transformers in science](https://arxiv.org/abs/2410.00273).
 
-You can also run CP with the TE model by using the config `mp_te`. For example, try running:
+You can also run CP with the TE model by using the config `mp_bs32_te`. For example, try running:
 ```
-sbatch --nodes=4 submit_pm_mp.sh --config=mp_te --tensor_parallel=1 --context_parallel=4 --parallel_order=cp-tp-dp --run_num=tp1cp4
+./submit_dli_mp.sh --config=mp_bs32_te --tensor_parallel=1 --context_parallel=2 --parallel_order=cp-tp-dp --run_num=tp1cp2
 ```
 
-**Note:** TE expects the local sequence lengths to be even for CP and equal on each CP rank. In our case, with CP=4, our sequence length (360 / 8 * 720 / 8 = 4050) gets split unevenly and with odd values. Hence, it is necessary to pad the sequence length to the next even value. We do this in the [vit_te.py](networks/vit_te.py#L185-L199) file. Hence, we pay a little extra compute. In general, if your workload deviates from the language model paradigm, then you may not be able to use TE directly out-of-the-box.
+**Note:** TE expects the local sequence lengths to be even for CP and equal on each CP rank. In our case, with CP=2, our sequence length (360 / 8 * 720 / 8 = 4050) gets split unevenly and with odd values. Hence, it is necessary to pad the sequence length to the next even value. We do this in the [vit_te.py](networks/vit_te.py#L185-L199) file. Hence, we pay a little extra compute. In general, if your workload deviates from the language model paradigm, then you may not be able to use TE directly out-of-the-box.
 
 
 ### Using CUDA Graphs (optional)
