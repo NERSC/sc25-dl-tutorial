@@ -16,7 +16,7 @@ This repository contains the example code material for the SC25 tutorial:
 
 Tutorial slides: https://drive.google.com/drive/folders/10sUC4RK98DlapVuPPekcjysOnYgEUn_Z?usp=sharing
 
-Join the Slack workspace: 
+Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invite/zt-3icqbsg2e-ZaYsHXdMs~rpt6b_2yw6gQ
 
 NERSC JupyterHub: https://jupyter.nersc.gov
 
