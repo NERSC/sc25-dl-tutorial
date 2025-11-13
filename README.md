@@ -297,13 +297,13 @@ This is the performance with batch size 16, 8 workers, DALI, and AMP BF16:
 
 For this model, we see a massive improvement when using AMP with either FP16 or BF16 precision, improving throughput to over 54 samples/s in each case. BF16 may have a slight edge over FP16 due to the lack of loss scaling.
 
-For the saved profile: This is ([`dali_amp_bf16.nsys-rep`](sample_nsys_profiles/dali_amp_bf16.nsys-rep)) looks like:
+For the saved profile: This is ([`baseline_dw8_dali_bf16.nsys-rep`](sample_nsys_profiles/baseline_dw8_dali_bf16.nsys-rep)) looks like:
 ![NSYS DALI AMP](tutorial_images/nsys_dali_bf16_zoomed.png)
 
 With AMP enabled, we see that the `forward` (and, correspondingly the backward) time is significantly reduced. The transformer
 architecture we are using relies mainly on GEMM operations that greatly benefit from mixed precision.
 
-### Just-in-time (JIT) compiliation via `torch.compile` and fused optimizers
+### Just-in-time (JIT) compilation via `torch.compile` and fused optimizers
 While AMP provided a large increase in compute speed already, there are a few other optimizations available for PyTorch to improve
 compute throughput. A first (and simple change) is to enable the `fused` option in the Adam optimizer from `torch.optim.Adam`.
 In the past, this fused optimizer was mainly available in
@@ -358,7 +358,7 @@ on the distributed package: https://pytorch.org/docs/stable/distributed.html
 To submit multi-GPU and multi-node jobs, we can use the same slurm script but specify either
 the number of tasks (GPUs) with `-n <number of tasks>` or `-N <number of nodes`. However for 
 this session we will be using a different, larger compute reservation, so we have copied
-the original submission script to a new one `submit_dp.sh` which will use the larger reservation.
+the original submission script to a new one (`submit_pm_dp.sh`) which will use the larger reservation.
 
 To submit a multi-node, multi-GPU job, you could do, e.g.:
 ```
