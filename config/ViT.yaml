@@ -16,7 +16,7 @@ base: &base
   amp_mode: none
   enable_fused: false
   enable_jit: false
-  expdir: '/logs'
+  expdir: '/dli/task/logs'
   lr_schedule: 'cosine'
   lr: 5E-4
   warmup: 0

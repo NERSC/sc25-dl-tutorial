@@ -134,7 +134,7 @@ We can also add calls to `torch.cuda.profiler.start()` and `torch.cuda.profiler.
 
 To generate a profile using our scripts, run the following command:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline-dli submit_dli.sh --config=short
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline-dli ./submit_dli.sh --config=short
 ```
 This command will run four epochs of the training script, profiling only the last epoch run. It will produce a file `baseline-dli.nsys-rep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed. The arg `-c cudaProfilerApi` instructs the profiler to only profile the duration of the runtime between the `torch.cuda.profiler.start()` and `torch.cuda.profiler.stop()` calls.
 
