@@ -34,6 +34,7 @@ export CUDA_VISIBLE_DEVICES=3,2,1,0
 # if cuda graphs, use train_mp_graphs.py
 set -x
 srun -u shifter -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
+    --env PYTHONUSERBASE=${LOGDIR} \
     bash -c "
     source export_DDP_vars.sh
     ${PROFILE_CMD} python train_mp.py ${args}
