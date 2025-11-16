@@ -374,7 +374,7 @@ PyTorch `DistributedDataParallel`, or DDP for short, is flexible and can initial
 When distributing a batch of samples in DDP training, we must make sure each rank gets a properly-sized subset of the full batch.
 *See if you can find where we use the `DistributedSampler` from PyTorch to properly partition the data in [`utils/data_loader.py`](utils/data_loader.py).*
 
-In `train.py`, after our U-Net model is constructed,
+In `train.py`, after our ViT model is constructed,
 we convert it to a distributed data parallel model by wrapping it as:
 ```
 model = DistributedDataParallel(model, device_ids=[local_rank])
