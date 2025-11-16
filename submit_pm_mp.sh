@@ -1,6 +1,7 @@
 #!/bin/bash 
 #SBATCH -C gpu
-#SBATCH -A nstaff
+#SBATCH -A ntrain5
+#SBATCH --reservation=sc25_dl_tutorial_2
 #SBATCH -q regular
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32

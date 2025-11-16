@@ -1,7 +1,8 @@
 #!/bin/bash 
 #SBATCH -C gpu 
 #SBATCH -q shared
-#SBATCH -A nstaff
+#SBATCH -A ntrain5
+#SBATCH --reservation=sc25_dl_tutorial_1
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-task 1
 #SBATCH --gpu-bind none

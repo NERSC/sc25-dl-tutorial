@@ -527,7 +527,7 @@ We have implemented a quick example that loads an MLP and tests this in [tests/m
 Let's try to fix it. First, let's request an interactive node to test the code by doing the following:
 
 ```
-salloc --nodes 1 --qos interactive -t 30 -C gpu -A ntrain5
+salloc --nodes 1 --qos interactive -t 30 -C gpu -A ntrain5 --reservation=sc25_dl_tutorial_2
 ```
 
 This will place you on a compute node with 4 GPUs. This is your test space where you can try things out using up to 4 GPUs. Try running the test with:
