@@ -21,14 +21,15 @@ from utils import get_data_loader_distributed
 from utils.loss import l2_loss, l2_loss_opt
 from utils.metrics import weighted_rmse
 from utils.plots import generate_images
+from utils import device as _device
 from networks import vit
 
 
 def train(params, args, local_rank, world_rank, world_size):
     # set device and benchmark mode
-    torch.backends.cudnn.benchmark = True
-    torch.cuda.set_device(local_rank)
-    device = torch.device("cuda:%d" % local_rank)
+    if _device.DEVICE_TYPE == "cuda":
+        torch.backends.cudnn.benchmark = True
+    device = _device.set_device(local_rank)
 
     # get data loader
     logging.info("rank %d, begin data loader init" % world_rank)
@@ -47,7 +48,7 @@ def train(params, args, local_rank, world_rank, world_size):
         model = torch.compile(model)
 
     if params.amp_dtype == torch.float16:
-        scaler = GradScaler("cuda")
+        scaler = GradScaler(_device.DEVICE_TYPE)
     if params.distributed and not args.noddp:
         if args.disable_broadcast_buffers:
             model = DistributedDataParallel(
@@ -122,7 +123,7 @@ def train(params, args, local_rank, world_rank, world_size):
     iters = 0
     t1 = time.time()
     for epoch in range(startEpoch, startEpoch + params.num_epochs):
-        torch.cuda.synchronize()  # device sync to ensure accurate epoch timings
+        _device.synchronize()  # device sync to ensure accurate epoch timings
         if params.distributed and (train_sampler is not None):
             train_sampler.set_epoch(epoch)
         start = time.time()
@@ -136,46 +137,46 @@ def train(params, args, local_rank, world_rank, world_size):
         for i, data in enumerate(train_data_loader, 0):
             if world_rank == 0:
                 if epoch == 3 and i == 0:
-                    torch.cuda.profiler.start()
+                    _device.profiler.start()
                 if epoch == 3 and i == len(train_data_loader) - 1:
-                    torch.cuda.profiler.stop()
+                    _device.profiler.stop()
 
-            torch.cuda.nvtx.range_push(f"step {i}")
+            _device.nvtx.range_push(f"step {i}")
             iters += 1
             dat_start = time.time()
-            torch.cuda.nvtx.range_push(f"data copy in {i}")
+            _device.nvtx.range_push(f"data copy in {i}")
 
             inp, tar = map(lambda x: x.to(device), data)
-            torch.cuda.nvtx.range_pop()  # copy in
+            _device.nvtx.range_pop()  # copy in
 
             tr_start = time.time()
             b_size = inp.size(0)
 
             optimizer.zero_grad()
 
-            torch.cuda.nvtx.range_push(f"forward")
-            with autocast("cuda", enabled=params.amp_enabled, dtype=params.amp_dtype):
+            _device.nvtx.range_push(f"forward")
+            with autocast(_device.DEVICE_TYPE, enabled=params.amp_enabled, dtype=params.amp_dtype):
                 gen = model(inp)
                 loss = loss_func(gen, tar)
-            torch.cuda.nvtx.range_pop()  # forward
+            _device.nvtx.range_pop()  # forward
 
             if params.amp_dtype == torch.float16:
                 scaler.scale(loss).backward()
-                torch.cuda.nvtx.range_push(f"optimizer")
+                _device.nvtx.range_push(f"optimizer")
                 scaler.step(optimizer)
-                torch.cuda.nvtx.range_pop()  # optimizer
+                _device.nvtx.range_pop()  # optimizer
                 scaler.update()
             else:
                 loss.backward()
-                torch.cuda.nvtx.range_push(f"optimizer")
+                _device.nvtx.range_push(f"optimizer")
                 optimizer.step()
-                torch.cuda.nvtx.range_pop()  # optimizer
+                _device.nvtx.range_pop()  # optimizer
 
             if params.distributed:
                 torch.distributed.all_reduce(loss)
             tr_loss.append(loss.item() / world_size)
 
-            torch.cuda.nvtx.range_pop()  # step
+            _device.nvtx.range_pop()  # step
             # lr step
             scheduler.step()
 
@@ -184,7 +185,7 @@ def train(params, args, local_rank, world_rank, world_size):
             dat_time += tr_start - dat_start
             step_count += 1
 
-        torch.cuda.synchronize()  # device sync to ensure accurate epoch timings
+        _device.synchronize()  # device sync to ensure accurate epoch timings
         end = time.time()
 
         if world_rank == 0:
@@ -218,7 +219,7 @@ def train(params, args, local_rank, world_rank, world_size):
             with torch.no_grad():
                 for i, data in enumerate(val_data_loader, 0):
                     with autocast(
-                        "cuda", enabled=params.amp_enabled, dtype=params.amp_dtype
+                        _device.DEVICE_TYPE, enabled=params.amp_enabled, dtype=params.amp_dtype
                     ):
                         inp, tar = map(lambda x: x.to(device), data)
                         gen = model(inp)
@@ -347,19 +348,25 @@ if __name__ == "__main__":
     if args.num_data_workers:
         params.update({"num_data_workers": args.num_data_workers})
 
-    params.distributed = False
-    if "WORLD_SIZE" in os.environ:
-        params.distributed = int(os.environ["WORLD_SIZE"]) > 1
+    # Distributed setup. Under srun (Perlmutter SLURM) or torchrun the
+    # WORLD_SIZE/RANK/LOCAL_RANK env vars are populated for us. Under
+    # mpiexec (Aurora/Sunspot PALS, plain mpi4py) they're not — fall back to
+    # ezpz.setup_torch() which discovers rank/world via MPI and initialises
+    # the process group with the right backend for the active device.
+    if os.environ.get("WORLD_SIZE", "").isdigit():
         world_size = int(os.environ["WORLD_SIZE"])
+        world_rank = int(os.environ.get("RANK", "0"))
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        if world_size > 1:
+            torch.distributed.init_process_group(
+                backend=_device.dist_backend(), init_method="env://"
+            )
     else:
-        world_size = 1
-
-    world_rank = 0
-    local_rank = 0
-    if params.distributed:
-        torch.distributed.init_process_group(backend="nccl", init_method="env://")
-        world_rank = torch.distributed.get_rank()
-        local_rank = int(os.environ["LOCAL_RANK"])
+        import ezpz
+        world_rank = ezpz.setup_torch()
+        world_size = ezpz.get_world_size()
+        local_rank = ezpz.get_local_rank()
+    params.distributed = world_size > 1
 
     if args.local_batch_size:
         # Manually override batch size

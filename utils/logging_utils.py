@@ -5,7 +5,17 @@ _format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 
 def slurm_filter(record):
-    return int(os.environ["SLURM_PROCID"]) == 0
+    # Only the rank-0 process emits log records. Works under SLURM, PALS,
+    # torchrun, or single-process — falls back to RANK/PMI_RANK if SLURM
+    # isn't set.
+    for var in ("SLURM_PROCID", "RANK", "PMI_RANK", "PMIX_RANK"):
+        val = os.environ.get(var)
+        if val is not None and val != "":
+            try:
+                return int(val) == 0
+            except ValueError:
+                continue
+    return True
 
 
 def config_logger(log_level=logging.INFO):
