@@ -354,9 +354,7 @@ if __name__ == "__main__":
     # ezpz.setup_torch() which discovers rank/world via MPI and initialises
     # the process group with the right backend for the active device.
     if os.environ.get("WORLD_SIZE", "").isdigit():
-        world_size = int(os.environ["WORLD_SIZE"])
-        world_rank = int(os.environ.get("RANK", "0"))
-        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        world_size, world_rank, local_rank = _device.distributed_env()
         if world_size > 1:
             torch.distributed.init_process_group(
                 backend=_device.dist_backend(), init_method="env://"
